@@ -1,1 +1,1 @@
-# deepFRI2
+# FRIdata
