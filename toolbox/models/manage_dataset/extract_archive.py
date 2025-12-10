@@ -11,7 +11,7 @@ from glob import iglob
 from tqdm import tqdm
 
 from dask.distributed import worker_client
-from toolbox.models.manage_dataset.index.handle_index import add_new_files_to_index
+from toolbox.models.manage_dataset.index.handle_index import add_new_files_to_index, create_index
 from toolbox.models.utils.create_client import total_workers
 
 from toolbox.models.manage_dataset.compute_batches import ComputeBatches
@@ -23,6 +23,7 @@ from toolbox.models.manage_dataset.utils import (
 from toolbox.models.utils.cif2pdb import cif_to_pdb
 
 from toolbox.utlis.logging import logger
+import re
 
 
 def extract_archive(
@@ -103,6 +104,9 @@ def save_extracted_files(
 
     logger.debug(f"extracted files: {len(files_name_to_dir)}")
 
+    for name, path in files_name_to_dir.items():
+        files_name_to_dir[name] = path.removeprefix(str(structures_dataset.input_path) + '/')
+
     present_files_set = set(files_name_to_dir.keys())
 
 
@@ -157,8 +161,17 @@ def save_extracted_files(
 
     logger.info("Adding new files to index")
 
+    for cif_file_name in cif_files_name_to_dir.keys():
+        match = re.match(r'^AF-(.+?)-F1-model_v\d+$', cif_file_name)
+        if match:
+            pdb_id = match.group(1)
+            chain_id = list(file_to_pdb(retrieve_single_file(cif_files_name_to_dir[cif_file_name])).keys())[0].split('_')[-1]
+            files_name_to_dir[pdb_id + "_" + chain_id] = files_name_to_dir[cif_file_name]
+            del files_name_to_dir[cif_file_name]
+
     try:
         add_new_files_to_index(structures_dataset.dataset_index_file_path(), new_files_index, structures_dataset.config.data_path)
+        create_index(structures_dataset.input_structures_index_path(), files_name_to_dir, structures_dataset.config.data_path)
     except Exception as e:
         logger.error(f"Failed to update index: {e}")
     

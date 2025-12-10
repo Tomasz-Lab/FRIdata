@@ -141,6 +141,10 @@ class StructuresDataset(BaseModel):
 
     def coordinates_index_path(self):
         return self.dataset_path() / "coordinates.idx"
+    
+    def input_structures_index_path(self):
+        return self.dataset_path() / "input_structures.idx"
+        
 
     def batches_count(self) -> int:
         """Count the number of batch directories (numeric directories only)."""
