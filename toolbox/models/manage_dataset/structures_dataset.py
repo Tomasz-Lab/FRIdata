@@ -1,3 +1,4 @@
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -7,7 +8,8 @@ from typing_extensions import Self
 import dask.bag as db
 import requests
 from Bio.PDB import PDBList
-from dask.distributed import Client, as_completed
+from dask.distributed import Client
+from dask.distributed import as_completed as dask_as_completed
 from pydantic import BaseModel, model_validator
 import requests
 import tarfile
@@ -32,7 +34,7 @@ from toolbox.models.manage_dataset.utils import (
     foldcomp_download,
     mkdir_for_batches,
     retrieve_pdb_chunk_to_h5,
-    retrieve_afdb_chunk_to_h5,
+    retrieve_afdb_chunk_to_h5_concurrent,
     alphafold_chunk_to_h5,
     format_time,
     chunk
@@ -418,96 +420,21 @@ class StructuresDataset(BaseModel):
         logger.info(f"Downloading {len(ids)} AFDB structures into {len(chunks)} new chunks (offset by {batch_offset})")
 
         new_files_index = {}
-
-        def run(input_data, machine):
-            return self._client.submit(
-                retrieve_afdb_chunk_to_h5,
-                *input_data,
-                [machine],
-                workers=[machine],
-            )
-
-        def collect(result):
-            downloaded_ids, file_path = result
-            logger.debug(f"Updating new_files_index with {len(downloaded_ids)} files")
-            new_files_index.update({k: file_path for k in downloaded_ids})
-
-        compute_batches = ComputeBatches(
-            self._client,
-            run,
-            collect,
-            "afdb",
-            len(chunks)
-        )
-
-        inputs = (
-            (afdb_repo_path / f"{i + batch_offset}", ids_chunk) for i, ids_chunk in enumerate(chunks)
-        )
-
-        factor = 10
-        factor = 15 if total_workers() > 1500 else factor
-        factor = 20 if total_workers() > 2000 else factor
-        compute_batches.compute(inputs, factor=factor)
-
-        logger.info("Adding new files to index")
-
-        try:
-            logger.info(f"Extracted {len(new_files_index)} new protein chain(s)")
-            self.add_new_files_to_index(new_files_index)
-        except Exception as e:
-            logger.error(f"Failed to update index: {e}")
-
-    def _download_afdb_(self, ids: List[str]):
-        # Convert AFDB IDs from format "AF-A0A009IHW8-F1-model_v4" to "A0A009IHW8"
-        # Handle IDs that may come in either format
-        processed_ids = []
-        for file_id in ids:
-            # Remove "AF-" prefix if present and "-F1-model_v4" suffix if present
-            processed_id = file_id.removeprefix("AF-").removesuffix("-F1-model_v4")
-            processed_ids.append(processed_id)
         
-        ids = processed_ids
-        logger.info(f"Processed {len(ids)} AFDB IDs for download")
-        
-        Path(self.structures_path()).mkdir(exist_ok=True, parents=True)
-        afdb_repo_path = self.structures_path()
-        chunks = list(self.chunk(ids))
-
-        mkdir_for_batches(afdb_repo_path, len(chunks))
-
-        logger.info(f"Downloading {len(ids)} AFDB structures into {len(chunks)} chunks")
-
-        new_files_index = {}
-
-        def run(input_data, machine):
-            return self._client.submit(
-                retrieve_afdb_chunk_to_h5,
-                *input_data,
-                [machine],
-                workers=[machine],
+        # Process each chunk with concurrent downloads
+        for chunk_idx, ids_chunk in enumerate(chunks):
+            batch_path = afdb_repo_path / f"{chunk_idx + batch_offset}"
+            
+            # Use ThreadPoolExecutor for concurrent downloads within this chunk
+            downloaded_ids, file_path = retrieve_afdb_chunk_to_h5_concurrent(
+                batch_path,
+                ids_chunk,
+                max_workers=(os.cpu_count() or 8),
             )
-
-        def collect(result):
-            downloaded_ids, file_path = result
-            logger.debug(f"Updating new_files_index with {len(downloaded_ids)} files")
-            new_files_index.update({k: file_path for k in downloaded_ids})
-
-        compute_batches = ComputeBatches(
-            self._client,
-            run,
-            collect,
-            "afdb",
-            len(chunks)
-        )
-
-        inputs = (
-            (afdb_repo_path / f"{i}", ids_chunk) for i, ids_chunk in enumerate(chunks)
-        )
-
-        factor = 10
-        factor = 15 if total_workers() > 1500 else factor
-        factor = 20 if total_workers() > 2000 else factor
-        compute_batches.compute(inputs, factor=factor)
+            
+            if downloaded_ids and file_path:
+                logger.debug(f"Updating new_files_index with {len(downloaded_ids)} files from chunk {chunk_idx}")
+                new_files_index.update({k: file_path for k in downloaded_ids})
 
         logger.info("Adding new files to index")
 
@@ -558,7 +485,7 @@ class StructuresDataset(BaseModel):
         i = 0
         total = len(futures)
 
-        for batch in as_completed(futures, with_results=True).batches():
+        for batch in dask_as_completed(futures, with_results=True).batches():
             for _, single_batch_index in batch:
                 result_index.update(single_batch_index)
                 logger.debug(f"Processing batch {i}/{total}")
