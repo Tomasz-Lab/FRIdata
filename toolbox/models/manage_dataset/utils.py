@@ -5,6 +5,7 @@ import tempfile
 import time
 import traceback
 import zlib
+import re
 
 from io import BytesIO, StringIO
 from itertools import islice
@@ -391,10 +392,10 @@ def retrieve_afdb_chunk_to_h5_concurrent(
                     if error is None:
                         successful_downloads.append(downloaded_id)
                     else:
-                        failed_downloads.append((downloaded_id, error))
+                        failed_downloads.append(downloaded_id)
                 except Exception as e:
                     logger.error(f"Unexpected error processing {uniprot_id}: {e}")
-                    failed_downloads.append((uniprot_id, e))
+                    failed_downloads.append(uniprot_id)
         
         if not successful_downloads:
             logger.warning(f"No AFDB structures were successfully downloaded for chunk (all {len(chunk_ids)} IDs failed)")
@@ -415,6 +416,8 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         if not cif_files:
             logger.warning(f"No CIF files found in temp directory after download")
             return [], ""
+
+        uniprot_ids_set = set(uniprot_ids)
         
         # Process each CIF file
         for cif_file in cif_files:
@@ -425,8 +428,11 @@ def retrieve_afdb_chunk_to_h5_concurrent(
                 
                 # Extract UniProt ID from filename (format: AF-{uniprot_id}-F1-model_v4.cif)
                 filename = cif_file.stem
-                # Remove AF- prefix and -F1-model_v4 suffix
-                uniprot_id = filename.removesuffix("-F1-model_v4").removeprefix("AF-")
+
+                if filename in uniprot_ids_set:
+                    uniprot_id = filename
+                else:
+                    uniprot_id = re.sub(r"-F1-model_v\d+$", "", filename).removeprefix("AF-")
                 
                 # Convert CIF to PDB format
                 converted = cif_to_pdb(cif_content, uniprot_id)
@@ -456,7 +462,7 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         if h5_file_path is None:
             return [], ""
         
-        return all_res_pdbs, h5_file_path
+        return all_res_pdbs, h5_file_path, failed_downloads
         
     finally:
         # Cleanup temporary directory

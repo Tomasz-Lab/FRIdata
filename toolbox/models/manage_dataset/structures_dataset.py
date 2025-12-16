@@ -316,17 +316,28 @@ class StructuresDataset(BaseModel):
                 # If extraction fails, we should not proceed
                 return
 
+        missing_files = None
+
         match self.db_type:
             case DatabaseType.PDB:
-                self.handle_pdb(ids)
+                missing_files = self.handle_pdb(ids)
             case DatabaseType.AFDB:
-                self.handle_afdb(ids)
+                missing_files = self.handle_afdb(ids)
             case DatabaseType.ESMatlas:
-                self.handle_esma()
+                missing_files = self.handle_esma()
             case DatabaseType.other:
                 self
 
+        if not missing_files:
+            return
+        
+        with open(self.dataset_path() / "missing_ids_files.txt", "w") as f:
+            for file in missing_files:
+                f.write(file + "\n")
+            logger.info(f"Missing files saved to {self.dataset_path() / 'missing_ids_files.txt'}")
+
     def handle_pdb(self, ids: List[str]):
+        missing_files = None
         match self.collection_type:
             case CollectionType.all:
                 self._download_pdb_(ids)
@@ -336,7 +347,7 @@ class StructuresDataset(BaseModel):
                 pass
             case CollectionType.subset:
                 self._download_pdb_(ids)
-
+        return missing_files
 
     def add_new_files_to_index(self, new_files_index):
         add_new_files_to_index(self.dataset_index_file_path(), new_files_index, self.config.data_path)
@@ -396,16 +407,8 @@ class StructuresDataset(BaseModel):
             logger.error(f"Failed to update index: {e}")
 
     def _download_afdb_(self, ids: List[str]):
-        # Convert AFDB IDs from format "AF-A0A009IHW8-F1-model_v4" to "A0A009IHW8"
-        # Handle IDs that may come in either format
-        processed_ids = []
-        for file_id in ids:
-            # Remove "AF-" prefix if present and "-F1-model_v4" suffix if present
-            processed_id = file_id.removeprefix("AF-").removesuffix("-F1-model_v4")
-            processed_ids.append(processed_id)
-        
-        ids = processed_ids
-        logger.info(f"Processed {len(ids)} AFDB IDs for download")
+        missing_files = []
+        logger.info(f"{len(ids)} AFDB IDs to download")
         
         Path(self.structures_path()).mkdir(exist_ok=True, parents=True)
         afdb_repo_path = self.structures_path()
@@ -426,15 +429,18 @@ class StructuresDataset(BaseModel):
             batch_path = afdb_repo_path / f"{chunk_idx + batch_offset}"
             
             # Use ThreadPoolExecutor for concurrent downloads within this chunk
-            downloaded_ids, file_path = retrieve_afdb_chunk_to_h5_concurrent(
+            downloaded_ids, file_path, _missing_files = retrieve_afdb_chunk_to_h5_concurrent(
                 batch_path,
                 ids_chunk,
                 max_workers=(os.cpu_count() or 8),
             )
+
+            missing_files.extend(_missing_files)
             
             if downloaded_ids and file_path:
                 logger.debug(f"Updating new_files_index with {len(downloaded_ids)} files from chunk {chunk_idx}")
                 new_files_index.update({k: file_path for k in downloaded_ids})
+            
 
         logger.info("Adding new files to index")
 
@@ -443,6 +449,8 @@ class StructuresDataset(BaseModel):
             self.add_new_files_to_index(new_files_index)
         except Exception as e:
             logger.error(f"Failed to update index: {e}")
+
+        return missing_files if len(missing_files) > 0 else None
 
     def foldcomp_decompress(self):
 
@@ -494,6 +502,7 @@ class StructuresDataset(BaseModel):
         create_index(self.dataset_index_file_path(), result_index, self.config.data_path)
 
     def handle_afdb(self, ids: List[str]):
+        missing_files = None
         match self.collection_type:
             case CollectionType.all:
                 pass
@@ -505,9 +514,10 @@ class StructuresDataset(BaseModel):
                 self.foldcomp_decompress()
             case CollectionType.subset:
                 if ids:
-                    self._download_afdb_(ids)
+                    missing_files = self._download_afdb_(ids)
                 else:
                     logger.info("No missing IDs to download for AFDB subset")
+        return missing_files
 
     def handle_esma(self):
         match self.collection_type:

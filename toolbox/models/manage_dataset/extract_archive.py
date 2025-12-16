@@ -120,20 +120,13 @@ def save_extracted_files(
         ids_set = set(ids)
 
         wanted_files = present_files_set & ids_set
-        wanted_files = [files_name_to_dir[file] for file in wanted_files]
+        wanted_files = [f"{structures_dataset.input_path}/{files_name_to_dir[file]}" for file in wanted_files]
         missing_files = list(ids_set - present_files_set)
 
         logger.info(f"Found {len(wanted_files)}, missing {len(missing_files)} out of {len(ids)} requested files")
-        
-        # Save missing files to disk for reference
-        with open(structures_dataset.dataset_path() / "missing_ids_files.txt", "w") as f:
-            for file in missing_files:
-                f.write(file + "\n")
-            logger.info(f"Missing files saved to {structures_dataset.dataset_path() / 'missing_ids_files.txt'}")
-        
         ids = wanted_files
 
-    chunks = list(structures_dataset.chunk(ids))
+        chunks = list(structures_dataset.chunk(ids))
 
     mkdir_for_batches(pdb_repo_path, len(chunks))
 
@@ -161,17 +154,34 @@ def save_extracted_files(
 
     logger.info("Adding new files to index")
 
-    for cif_file_name in cif_files_name_to_dir.keys():
-        match = re.match(r'^AF-(.+?)-F1-model_v\d+$', cif_file_name)
-        if match:
-            pdb_id = match.group(1)
-            chain_id = list(file_to_pdb(retrieve_single_file(cif_files_name_to_dir[cif_file_name])).keys())[0].split('_')[-1]
-            files_name_to_dir[pdb_id + "_" + chain_id] = files_name_to_dir[cif_file_name]
-            del files_name_to_dir[cif_file_name]
+    no_chain_to_chain_dict = {}
+    for id_with_chain in new_files_index.keys():
+        # Remove last '_' and everything after it to get id_without_chain
+        id_without_chain = id_with_chain.rsplit('_', 1)[0]
+        no_chain_to_chain_dict[id_without_chain] = id_with_chain
+
+    input_structures_index = {}
+
+    for file_path_str in files_name_to_dir.values():
+        file_path = Path(file_path_str)
+        file_name_without_extension = file_path.stem
+
+        id_with_chain = no_chain_to_chain_dict.get(file_name_without_extension, None)
+
+        input_structures_index[id_with_chain] = file_path.name
+        
+
+    # for cif_file_name in cif_files_name_to_dir.keys():
+    #     match = re.match(r'^AF-(.+?)-F1-model_v\d+$', cif_file_name)
+    #     if match:
+    #         pdb_id = match.group(1)
+    #         chain_id = list(file_to_pdb(retrieve_single_file(cif_files_name_to_dir[cif_file_name])).keys())[0].split('_')[-1]
+    #         files_name_to_dir[pdb_id + "_" + chain_id] = files_name_to_dir[cif_file_name]
+    #         del files_name_to_dir[cif_file_name]
 
     try:
         add_new_files_to_index(structures_dataset.dataset_index_file_path(), new_files_index, structures_dataset.config.data_path)
-        create_index(structures_dataset.input_structures_index_path(), files_name_to_dir, structures_dataset.config.data_path)
+        create_index(structures_dataset.input_structures_index_path(), input_structures_index, structures_dataset.config.data_path)
     except Exception as e:
         logger.error(f"Failed to update index: {e}")
     
