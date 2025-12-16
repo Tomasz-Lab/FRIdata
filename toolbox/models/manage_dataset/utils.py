@@ -353,7 +353,7 @@ def retrieve_afdb_chunk_to_h5_concurrent(
     path_for_batch: Path,
     uniprot_ids: Iterable[str],
     max_workers: int = 8,
-) -> Tuple[List[str], str]:
+) -> Tuple[List[str], str, List[str]]:
     """
     Download AFDB structures for a chunk of UniProt IDs concurrently using ThreadPoolExecutor,
     convert to PDB format, and save to HDF5 file.
@@ -364,11 +364,14 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         max_workers: Maximum number of concurrent download threads (default: 8)
     
     Returns:
-        Tuple of (list of successfully processed IDs, path to HDF5 file)
+        Tuple of:
+          - list of successfully processed chain IDs (what gets written to HDF5)
+          - path to the HDF5 file (empty string on failure)
+          - list of missing UniProt IDs from the input chunk (retry candidates)
     """
     chunk_ids = list(uniprot_ids)
     if not chunk_ids:
-        return [], ""
+        return [], "", []
     
     temp_dir = None
     try:
@@ -399,7 +402,7 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         
         if not successful_downloads:
             logger.warning(f"No AFDB structures were successfully downloaded for chunk (all {len(chunk_ids)} IDs failed)")
-            return [], ""
+            return [], "", chunk_ids
         
         if failed_downloads:
             logger.warning(f"Failed to download {len(failed_downloads)} out of {len(chunk_ids)} IDs")
@@ -409,15 +412,16 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         # Process downloaded CIF files
         all_res_pdbs = []
         all_contents = []
+        succeeded_uniprot_ids = set()
         
         # Get all downloaded CIF files
         cif_files = list(temp_dir.glob("*.cif"))
         
         if not cif_files:
             logger.warning(f"No CIF files found in temp directory after download")
-            return [], ""
+            return [], "", chunk_ids
 
-        uniprot_ids_set = set(uniprot_ids)
+        chunk_ids_set = set(chunk_ids)
         
         # Process each CIF file
         for cif_file in cif_files:
@@ -429,7 +433,7 @@ def retrieve_afdb_chunk_to_h5_concurrent(
                 # Extract UniProt ID from filename (format: AF-{uniprot_id}-F1-model_v4.cif)
                 filename = cif_file.stem
 
-                if filename in uniprot_ids_set:
+                if filename in chunk_ids_set:
                     uniprot_id = filename
                 else:
                     uniprot_id = re.sub(r"-F1-model_v\d+$", "", filename).removeprefix("AF-")
@@ -445,6 +449,7 @@ def retrieve_afdb_chunk_to_h5_concurrent(
                 for chain_id, pdb_content in converted.items():
                     all_res_pdbs.append(chain_id)
                     all_contents.append(pdb_content)
+                succeeded_uniprot_ids.add(uniprot_id)
                     
             except Exception as e:
                 logger.error(f"Error processing {cif_file}: {e}")
@@ -454,15 +459,16 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         # Save to HDF5
         if len(all_res_pdbs) == 0 or len(all_contents) == 0:
             logger.warning("No PDB structures to save")
-            return [], ""
+            return [], "", chunk_ids
         
         results = (all_res_pdbs, all_contents, [])
         h5_file_path = compress_and_save_h5(path_for_batch, results)
         
         if h5_file_path is None:
-            return [], ""
+            return [], "", chunk_ids
         
-        return all_res_pdbs, h5_file_path, failed_downloads
+        missing_ids = [uniprot_id for uniprot_id in chunk_ids if uniprot_id not in succeeded_uniprot_ids]
+        return all_res_pdbs, h5_file_path, missing_ids
         
     finally:
         # Cleanup temporary directory
