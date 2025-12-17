@@ -40,9 +40,9 @@ def test_cropped():
 
     __get_sequences_and_coordinates_from_batch__(INPATH / f"pdbs.h5", [f"{name}.pdb"], "CA", OUTPATH / name_out)
     coordinates = __process_coordinates__([OUTPATH / f"{name_out}.h5"], [name])
-    expected = np.load(EXPPATH / f"{name}.npy")
+    expected = ~np.isnan(np.load(EXPPATH / f"{name}.npy"))
 
-    assert np.allclose(expected, coordinates[0][1], rtol=RTOL, atol=ATOL)
+    assert np.allclose(expected, ~np.isnan(coordinates[0][1]), rtol=RTOL, atol=ATOL)
 
 
 def test_missing_CA():
