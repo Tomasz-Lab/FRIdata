@@ -8,7 +8,7 @@ from dask.distributed import Client, LocalCluster
 import logging
 import warnings
 import distributed
-
+import pathlib
 from tests.utils import compare_dicts, compare_pdb_contents, FileComparator
 from tests.paths import OUTPATH, EXPPATH
 from toolbox.config import Config
@@ -208,6 +208,15 @@ def create_dataset_and_abstractions(dataset_name, ids_file_path, overwrite=False
     total_time = create_time + sequence_time + distogram_time + embedding_time
     print(f"Total processing time: {total_time:.2f} seconds")
     print(f"=== Completed dataset creation for {dataset_name} ===\n")
+    
+def adjust_expected_dataset_config_paths(dataset_config):
+    def replace_path(path):
+        path_split = path.split("/tests/")
+        path_split[0] = str(pathlib.Path(__file__).parent.resolve())
+        return "/".join(path_split)
+    dataset_config["ids_file"] = replace_path(dataset_config["ids_file"])
+    dataset_config["config"]["data_path"] = replace_path(dataset_config["config"]["data_path"])
+    return dataset_config
 
 
 def compare_index_files(dataset_name):
@@ -231,7 +240,10 @@ def compare_index_files(dataset_name):
         if file_name.endswith(".idx") or file_name.endswith(".json"):
             with open(file_path) as f, open(expected_path / file_name) as f_expected:
                 dataset_idx = json.load(f)
-                expected_idx = json.load(f_expected)
+                if file_name.endswith(".json"):
+                    expected_idx = adjust_expected_dataset_config_paths(json.load(f_expected))
+                else:
+                    expected_idx = json.load(f_expected)
 
                 if dataset_idx.get("created_at"):
                     del dataset_idx["created_at"]
