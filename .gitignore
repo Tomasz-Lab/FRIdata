@@ -21,3 +21,4 @@ dask-scratch-space
 
 *.h5
 !tests/data/distograms_pdbs/pdbs.h5
+!tests/data/dataset_expected/structures/*/*/*/*/*.h5
