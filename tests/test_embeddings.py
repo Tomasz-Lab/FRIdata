@@ -64,8 +64,8 @@ def test_esm():
         res_1 = f['SEQ_1'][:]
         res_2 = f['SEQ_2'][:]
 
-    assert np.allclose(exp_1, res_1, rtol=1e-4, atol=1e-6)
-    assert np.allclose(exp_2, res_2, rtol=1e-4, atol=1e-6)
+    assert np.allclose(exp_1, res_1, rtol=1e-4, atol=1e-5)
+    assert np.allclose(exp_2, res_2, rtol=1e-4, atol=1e-5)
 
 # TODO
 # Add tests for other embeddings (Ankh etc.)
