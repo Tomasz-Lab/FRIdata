@@ -22,5 +22,10 @@ jobs:
           cache-environment: true
           cache-downloads: true
 
+      - name: Install CPU-only PyTorch and dependencies
+        run: |
+          micromamba install -y pytorch cpuonly -c pytorch -c conda-forge
+          pip install esm
+
       - name: Run tests
         run: pytest ./tests

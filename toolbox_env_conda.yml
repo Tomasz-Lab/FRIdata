@@ -16,8 +16,8 @@ dependencies:
       - genson
       - bs4
       - bio~=1.7.0
+      - pytest
       - pytest-order
-      - esm
   - dask>=2024.4.2,<2025.0.0
   - dask[dataframe]
   - distributed>=2024.4.2,<2025.0.0
@@ -26,7 +26,8 @@ dependencies:
   - biopython
   - bokeh>=2.4.2,<3.0.0
   - pdbfixer
-  - pytorch-gpu
+  # PyTorch and ESM installed separately via install.sh (GPU or CPU variant)
+  # ESM requires PyTorch to be installed first
   - mamba
   - transformers
   - tqdm
