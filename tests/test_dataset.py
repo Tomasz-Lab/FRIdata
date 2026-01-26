@@ -178,7 +178,7 @@ def create_dataset_and_abstractions(dataset_name, ids_file_path, overwrite=False
         ids_file=ids_file_path,
         overwrite=overwrite,
         config=config,
-        embedder_type=EmbedderType.ESM2_T33_650M,
+        embedder_type=EmbedderType.ESM2_T30_150M,
     )
     dataset._client = client
 

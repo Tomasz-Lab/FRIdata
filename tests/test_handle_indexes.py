@@ -57,7 +57,7 @@ def cleanup_global_dask():
 
 
 def test_embeddings_for_esm2_ca_present():
-    found_items = perform_index_search("embeddings", EmbedderType.ESM2_T33_650M, "CA")
+    found_items = perform_index_search("embeddings", EmbedderType.ESM2_T30_150M, "CA")
     assert len(found_items) > 0
 
 def test_embeddings_for_esmc_ca_missing():

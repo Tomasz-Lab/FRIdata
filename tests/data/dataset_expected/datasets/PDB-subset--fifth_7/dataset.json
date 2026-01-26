@@ -11,9 +11,9 @@
   "binary_data_download": false,
   "is_hpc_cluster": false,
   "input_path": null,
-  "embedder_type": "esm2_t33_650M_UR50D",
-  "embedding_size": 1280,
-  "created_at": "1761587206816347",
+  "embedder_type": "esm2_t30_150M_UR50D",
+  "embedding_size": 640,
+  "created_at": "1769457791532477",
   "config": {
     "debug_mode": "warning",
     "data_path": "/mnt/vdb2/var/storage/deepfri2/toolbox/deepFRI2-toolbox-dev/tests/data/dataset_generated",
