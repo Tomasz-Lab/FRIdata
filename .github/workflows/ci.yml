@@ -32,15 +32,34 @@ jobs:
             ~/micromamba-bin
           key: ${{ steps.cache-key.outputs.key }}
 
-      - name: Setup micromamba
+      - name: Setup micromamba (cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: toolbox_env_conda.yml
           environment-name: tbe
           cache-environment: false
           cache-downloads: false
-          # Skip environment creation if restored from cache
+          micromamba-binary-path: ~/micromamba-bin/micromamba
+          micromamba-root-path: ~/micromamba
           init-shell: bash
+
+      - name: Initialize micromamba from cache (cache hit)
+        if: steps.cache-restore.outputs.cache-hit == 'true'
+        run: |
+          # Set up micromamba shell hooks in bash profile so they persist across steps
+          # This mimics what setup-micromamba does with init-shell: bash
+          MICROMAMBA_ROOT=~/micromamba
+          export MAMBA_ROOT_PREFIX=$MICROMAMBA_ROOT
+          # Add initialization to .bashrc so it's available in subsequent steps
+          echo 'export MAMBA_ROOT_PREFIX=~/micromamba' >> ~/.bashrc
+          echo 'export PATH="$HOME/micromamba-bin:$MAMBA_ROOT_PREFIX/bin:$PATH"' >> ~/.bashrc
+          echo 'eval "$(~/micromamba-bin/micromamba shell hook --shell bash)"' >> ~/.bashrc
+          # Also initialize for current step
+          eval "$(~/micromamba-bin/micromamba shell hook --shell bash)"
+          # Verify setup
+          micromamba --version
+          micromamba env list
 
       - name: Install CPU-only PyTorch and dependencies
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -58,4 +77,7 @@ jobs:
           key: ${{ steps.cache-key.outputs.key }}
 
       - name: Run tests
-        run: pytest ./tests
+        run: |
+          # Activate environment (needed for cache hit case)
+          micromamba activate tbe
+          pytest ./tests
