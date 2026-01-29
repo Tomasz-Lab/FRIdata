@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          # Create a hash from the environment file and PyTorch CPU install string
+          ENV_HASH=$(sha256sum toolbox_env_conda.yml | cut -d' ' -f1)
+          PYTORCH_SPEC="pytorch-cpuonly"
+          CACHE_KEY="micromamba-${{ runner.os }}-${ENV_HASH}-${PYTORCH_SPEC}"
+          echo "key=${CACHE_KEY}" >> $GITHUB_OUTPUT
+
+      - name: Restore micromamba environment cache
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/micromamba/envs
+            ~/micromamba-bin
+          key: ${{ steps.cache-key.outputs.key }}
+
+      - name: Setup micromamba (cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: toolbox_env_conda.yml
+          environment-name: tbe
+          cache-environment: false
+          cache-downloads: false
+          micromamba-binary-path: ~/micromamba-bin/micromamba
+          micromamba-root-path: ~/micromamba
+          init-shell: bash
+
+      - name: Initialize micromamba from cache (cache hit)
+        if: steps.cache-restore.outputs.cache-hit == 'true'
+        run: |
+          # Make micromamba available to subsequent steps without shell hooks
+          echo "$HOME/micromamba-bin" >> "$GITHUB_PATH"
+          echo "MAMBA_ROOT_PREFIX=$HOME/micromamba" >> "$GITHUB_ENV"
+
+      - name: Install CPU-only PyTorch and dependencies
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: |
+          ~/micromamba-bin/micromamba install -n tbe -y pytorch cpuonly -c pytorch -c conda-forge
+          pip install esm
+
+      - name: Save micromamba environment cache
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/micromamba/envs
+            ~/micromamba-bin
+          key: ${{ steps.cache-key.outputs.key }}
+
+      - name: Run tests
+        run: |
+          ~/micromamba-bin/micromamba run -n tbe pytest ./tests

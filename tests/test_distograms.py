@@ -14,6 +14,9 @@ INPATH = Path(__file__).parent / "data" / "distograms_pdbs"
 OUTPATH = Path(__file__).parent / "data" / "distograms_generated"
 EXPPATH = Path(__file__).parent / "data" / "distograms_expected"
 
+# Ensure output directory exists (needed for CI where it doesn't exist)
+OUTPATH.mkdir(parents=True, exist_ok=True)
+
 RTOL = 1e-3  # TODO: small precision
 ATOL = 1e-8
 

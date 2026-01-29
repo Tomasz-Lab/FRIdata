@@ -3,6 +3,7 @@
 config.json
 
 tests/data/dataset_generated
+tests/data/distograms_generated
 tests/data/pdb_generated
 tests/data/data.info
 tests/data/dataset_expected_backup/*
