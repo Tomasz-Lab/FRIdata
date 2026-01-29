@@ -32,6 +32,71 @@ jobs:
             ~/micromamba-bin
           key: ${{ steps.cache-key.outputs.key }}
 
+      - name: Debug micromamba cache state
+        env:
+          CACHE_HIT: ${{ steps.cache-restore.outputs.cache-hit }}
+        run: |
+          # #region agent log
+          python - <<'PY'
+          import json
+          import os
+          import stat
+          import time
+          from pathlib import Path
+          import shutil
+
+          workspace = os.environ.get("GITHUB_WORKSPACE", "")
+          log_path = Path(workspace) / ".cursor" / "debug.log"
+          log_path.parent.mkdir(parents=True, exist_ok=True)
+
+          def write_log(message, data, hypothesis_id):
+              payload = {
+                  "sessionId": "debug-session",
+                  "runId": "ci-pre",
+                  "hypothesisId": hypothesis_id,
+                  "location": "ci.yml:debug-micromamba-cache-state",
+                  "message": message,
+                  "data": data,
+                  "timestamp": int(time.time() * 1000),
+              }
+              with log_path.open("a", encoding="utf-8") as handle:
+                  handle.write(json.dumps(payload) + "\n")
+
+          cache_hit = os.environ.get("CACHE_HIT", "")
+          binary_path = Path.home() / "micromamba-bin" / "micromamba"
+          root_path = Path.home() / "micromamba"
+          binary_exists = binary_path.exists()
+          root_exists = root_path.exists()
+          binary_stat = None
+          if binary_exists:
+              st = binary_path.stat()
+              binary_stat = {
+                  "mode": stat.filemode(st.st_mode),
+                  "size": st.st_size,
+                  "is_exec": os.access(binary_path, os.X_OK),
+              }
+          write_log(
+              "cache-restore output and paths",
+              {
+                  "cache_hit": cache_hit,
+                  "binary_path": str(binary_path),
+                  "root_path": str(root_path),
+                  "binary_exists": binary_exists,
+                  "root_exists": root_exists,
+              },
+              "H1",
+          )
+          write_log(
+              "binary metadata and shell resolution",
+              {
+                  "binary_stat": binary_stat,
+                  "which_micromamba": shutil.which("micromamba"),
+              },
+              "H2",
+          )
+          PY
+          # #endregion
+
       - name: Setup micromamba (cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
         uses: mamba-org/setup-micromamba@v2
@@ -47,24 +112,17 @@ jobs:
       - name: Initialize micromamba from cache (cache hit)
         if: steps.cache-restore.outputs.cache-hit == 'true'
         run: |
-          # Set up micromamba shell hooks in bash profile so they persist across steps
-          # This mimics what setup-micromamba does with init-shell: bash
-          MICROMAMBA_ROOT=~/micromamba
-          export MAMBA_ROOT_PREFIX=$MICROMAMBA_ROOT
-          # Add initialization to .bashrc so it's available in subsequent steps
-          echo 'export MAMBA_ROOT_PREFIX=~/micromamba' >> ~/.bashrc
-          echo 'export PATH="$HOME/micromamba-bin:$MAMBA_ROOT_PREFIX/bin:$PATH"' >> ~/.bashrc
-          echo 'eval "$(~/micromamba-bin/micromamba shell hook --shell bash)"' >> ~/.bashrc
-          # Also initialize for current step
-          eval "$(~/micromamba-bin/micromamba shell hook --shell bash)"
-          # Verify setup
-          micromamba --version
-          micromamba env list
+          # Make micromamba available to subsequent steps without shell hooks
+          echo "$HOME/micromamba-bin" >> "$GITHUB_PATH"
+          echo "MAMBA_ROOT_PREFIX=$HOME/micromamba" >> "$GITHUB_ENV"
+          # Verify setup using full path
+          ~/micromamba-bin/micromamba --version
+          ~/micromamba-bin/micromamba env list
 
       - name: Install CPU-only PyTorch and dependencies
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: |
-          micromamba install -y pytorch cpuonly -c pytorch -c conda-forge
+          ~/micromamba-bin/micromamba install -n tbe -y pytorch cpuonly -c pytorch -c conda-forge
           pip install esm
 
       - name: Save micromamba environment cache
@@ -78,6 +136,64 @@ jobs:
 
       - name: Run tests
         run: |
-          # Activate environment (needed for cache hit case)
-          micromamba activate tbe
-          pytest ./tests
+          ~/micromamba-bin/micromamba run -n tbe pytest ./tests
+
+      - name: Debug micromamba runtime state
+        if: always()
+        run: |
+          # #region agent log
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          import time
+          from pathlib import Path
+
+          workspace = os.environ.get("GITHUB_WORKSPACE", "")
+          log_path = Path(workspace) / ".cursor" / "debug.log"
+          log_path.parent.mkdir(parents=True, exist_ok=True)
+
+          def write_log(message, data, hypothesis_id):
+              payload = {
+                  "sessionId": "debug-session",
+                  "runId": "ci-post",
+                  "hypothesisId": hypothesis_id,
+                  "location": "ci.yml:debug-micromamba-runtime-state",
+                  "message": message,
+                  "data": data,
+                  "timestamp": int(time.time() * 1000),
+              }
+              with log_path.open("a", encoding="utf-8") as handle:
+                  handle.write(json.dumps(payload) + "\n")
+
+          def run_cmd(cmd):
+              try:
+                  result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+                  return result.returncode, result.stdout.strip(), result.stderr.strip()
+              except Exception as exc:
+                  return 1, "", str(exc)
+
+          which_code, which_out, which_err = run_cmd(["/usr/bin/which", "micromamba"])
+          version_code, version_out, version_err = run_cmd(["/home/runner/micromamba-bin/micromamba", "--version"])
+          write_log(
+              "runtime micromamba availability",
+              {
+                  "path_env": os.environ.get("PATH"),
+                  "which_code": which_code,
+                  "which_out": which_out,
+                  "which_err": which_err,
+                  "version_code": version_code,
+                  "version_out": version_out,
+                  "version_err": version_err,
+              },
+              "H3",
+          )
+          PY
+          # #endregion
+
+      - name: Upload debug log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: micromamba-debug-log
+          path: .cursor/debug.log
