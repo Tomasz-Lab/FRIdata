@@ -14,18 +14,48 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          # Create a hash from the environment file and PyTorch CPU install string
+          ENV_HASH=$(sha256sum toolbox_env_conda.yml | cut -d' ' -f1)
+          PYTORCH_SPEC="pytorch-cpuonly"
+          CACHE_KEY="micromamba-${{ runner.os }}-${ENV_HASH}-${PYTORCH_SPEC}"
+          echo "key=${CACHE_KEY}" >> $GITHUB_OUTPUT
+
+      - name: Restore micromamba environment cache
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/micromamba/envs
+            ~/micromamba-bin
+          key: ${{ steps.cache-key.outputs.key }}
+
       - name: Setup micromamba
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: toolbox_env_conda.yml
           environment-name: tbe
-          cache-environment: true
-          cache-downloads: true
+          cache-environment: false
+          cache-downloads: false
+          # Skip environment creation if restored from cache
+          init-shell: bash
 
       - name: Install CPU-only PyTorch and dependencies
+        if: steps.cache-restore.outputs.cache-hit != 'true'
         run: |
           micromamba install -y pytorch cpuonly -c pytorch -c conda-forge
           pip install esm
+
+      - name: Save micromamba environment cache
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/micromamba/envs
+            ~/micromamba-bin
+          key: ${{ steps.cache-key.outputs.key }}
 
       - name: Run tests
         run: pytest ./tests
