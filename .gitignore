@@ -8,6 +8,8 @@ tests/data/pdb_generated
 tests/data/data.info
 tests/data/dataset_expected_backup/*
 
+docs/*
+
 __pycache__/
 */__pycache__/
 */*/__pycache__/
