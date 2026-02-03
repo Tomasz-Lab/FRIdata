@@ -168,7 +168,7 @@ class CommandParser:
 
     def export_index_view(self):
         # CLI handler for export-index-view
-        # Uses global config from args/config loaded in toolbox.py
+        # Uses global config from args/config loaded in fridata.py
         index_types = None
         if hasattr(self.args, 'index_types') and self.args.index_types and self.args.index_types != 'all':
             index_types = [s.strip() for s in self.args.index_types.split(',') if s.strip()]

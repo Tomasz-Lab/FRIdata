@@ -74,7 +74,7 @@ EMBEDDER_TYPE=esm2_t33_650M_UR50D
 # (MACOS only) Fix for OpenMP multiple runtime error
 export KMP_DUPLICATE_LIB_OK=TRUE
 
-PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/toolbox.py \
+PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/fridata.py \
  input_generation \
  -t sequences,coordinates,distograms,embeddings \
  -d AFDB \

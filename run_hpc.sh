@@ -19,4 +19,4 @@ cd ./deepFRI2-toolbox-dev
 
 #PYTHONPATH='.' python3 -u toolbox/monitoring/scrap-metrics.py &>scrapping_logs.txt &
 
-PYTHONPATH='.' python3 ./toolbox.py -d AFDB -c part -t afdb_swissprot_v4
+PYTHONPATH='.' python3 ./fridata.py -d AFDB -c part -t afdb_swissprot_v4
