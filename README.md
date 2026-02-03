@@ -1,5 +1,11 @@
 # FRIdata
 
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg?style=flat-square)](https://opensource.org/licenses/BSD-3-Clause)
+[![Python](https://img.shields.io/badge/python-3.10-blue.svg?style=flat-square&logo=python)](https://www.python.org/)
+[![CI](https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml/badge.svg)](https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml)
+[![Source](https://img.shields.io/badge/source-GitHub-303030.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/)
+[![GitHub issues](https://img.shields.io/github/issues/Tomasz-Lab/FRIdata.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/issues)
+
 ## Instalation and activation
 
 1. Download the repo
