@@ -2,7 +2,7 @@ import os
 
 import dask
 from dask.distributed import LocalCluster, Client
-
+import asyncio
 import warnings
 import distributed
 
@@ -59,6 +59,8 @@ class WorkerLogFilter(logging.Filter):
             return False
         if "Register worker" in message:
             return False
+        if "Worker process still alive after" in message:
+            return False
         # Filter out separator lines
         if message.strip() == "-" * len(message.strip()) and len(message.strip()) > 10:
             return False
@@ -93,11 +95,13 @@ def create_client(is_slurm_client: bool):
     
     # Silence specific Dask warnings
     warnings.simplefilter("ignore", distributed.comm.core.CommClosedError)
+    warnings.simplefilter("ignore", asyncio.exceptions.CancelledError)
+    warnings.simplefilter("ignore", asyncio.exceptions.TimeoutError)
     ignore_list = [
         ".*Creating scratch directories is taking a surprisingly long time.*",
         "Failed to communicate with scheduler during heartbeat.*",
         "Connection to tcp:*has been closed.*",
-        
+        "Worker process still alive after.*",
     ]   
     for warning in ignore_list:
         warnings.filterwarnings(
