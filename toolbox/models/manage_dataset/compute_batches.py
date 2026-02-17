@@ -9,6 +9,7 @@ from toolbox.models.manage_dataset.utils import format_time
 from dask.distributed import Client, Semaphore, as_completed, Future
 from distributed import Variable
 
+from tqdm.contrib.logging import logging_redirect_tqdm
 from tqdm import tqdm
 
 from toolbox.models.utils.create_client import total_workers, get_cluster_machines
@@ -85,7 +86,8 @@ def collect(ac: as_completed, collect_f, semaphore: Semaphore, computation_name:
     logger.debug("Collecting Dask results collection started")
     total_time = 0
     stop_var = Variable("stopping-criterion")
-    with tqdm(total=inputs_len) as pbar:
+    with logging_redirect_tqdm():
+        pbar = tqdm(total=inputs_len)
         while True:
 
             while ac.is_empty() and not stop_var.get():
@@ -112,6 +114,8 @@ def collect(ac: as_completed, collect_f, semaphore: Semaphore, computation_name:
 
             if ac.is_empty() and stop_var.get():
                 break
+
+        pbar.close()
 
     logger.debug(f"Collect results time: {format_time(total_time)}")
     logger.debug("Dask results collection finished")

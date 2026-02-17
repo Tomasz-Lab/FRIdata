@@ -142,12 +142,14 @@ def save_extracted_files(
         new_files_index.update({k: file_path for k in downloaded_pdbs})
 
     compute_batches = ComputeBatches(
-        structures_dataset._client, run, collect, "pdb_extracted_from_archive"
+        structures_dataset._client, run, collect, "pdb_extracted_from_archive", len(chunks)
     )
 
     inputs = ((pdb_repo_path / f"{i}", ids_chunk) for i, ids_chunk in enumerate(chunks))
 
-    factor = 10
+    logger.info(f"Extracting PDBs from archive {extracted_path} in {len(chunks)} batches")
+
+    factor = 1
     factor = 15 if total_workers() > 1500 else factor
     factor = 20 if total_workers() > 2000 else factor
     compute_batches.compute(inputs, factor=factor)
