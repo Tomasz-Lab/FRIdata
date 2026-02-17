@@ -6,6 +6,8 @@ from typing import Dict, Iterator, List, Optional, Tuple, Any
 import json
 import re
 
+from tqdm import tqdm
+
 from toolbox.config import Config, load_config
 
 
@@ -91,6 +93,14 @@ def discover_dataset(
             identity = _parse_identity_from_folder_name(d.name)
             if identity:
                 return DatasetMeta(identity=identity, path=d)
+
+        # Fallback: user may have passed the full folder name instead of just the slug
+        exact = datasets_root / dataset_slug
+        if exact.is_dir():
+            identity = _parse_identity_from_folder_name(exact.name)
+            if identity:
+                return DatasetMeta(identity=identity, path=exact)
+
         raise FileNotFoundError(f"Dataset with slug '{dataset_slug}' not found under {datasets_root}")
 
     # Case 3: nothing specified -> attempt to pick latest or raise
@@ -111,21 +121,30 @@ def find_index_files(dataset_dir: Path) -> Dict[str, IndexPaths]:
 # Parsing helpers
 # ----------------------------
 
-def stream_parse_idx(path: Path) -> Iterator[Tuple[str, Any]]:
+def stream_parse_idx(path: Path, show_progress: bool = False, desc: str = "") -> Iterator[Tuple[str, Any]]:
     """Yield (key, value) pairs from a top-level JSON object index file.
 
     This implementation loads the JSON once and streams items; suitable for moderate file sizes.
+    
+    Args:
+        path: Path to the index file
+        show_progress: If True, show a progress bar
+        desc: Description for the progress bar
     """
     with path.open("r") as f:
         data = json.load(f)
+    
     if isinstance(data, dict):
-        for k, v in data.items():
+        items = list(data.items())
+        iterator = tqdm(items, desc=desc, leave=False, unit="entry") if show_progress else items
+        for k, v in iterator:
             yield k, v
     else:
         # Accept list of pairs [[k, v], ...] as fallback
-        for item in data:
-            if isinstance(item, list) and len(item) == 2:
-                yield item[0], item[1]
+        items = [item for item in data if isinstance(item, list) and len(item) == 2]
+        iterator = tqdm(items, desc=desc, leave=False, unit="entry") if show_progress else items
+        for item in iterator:
+            yield item[0], item[1]
 
 
 def extract_dataset_identity_from_path(path: str) -> Optional[DatasetIdentity]:
@@ -174,6 +193,7 @@ def compute_index_stats(
     index_type: str,
     forward_path: Optional[Path],
     reversed_path: Optional[Path],
+    show_progress: bool = False,
 ) -> Dict[str, Any]:
     forward_present = bool(forward_path and forward_path.exists())
     reversed_present = bool(reversed_path and reversed_path.exists())
@@ -187,7 +207,8 @@ def compute_index_stats(
     if forward_present:
         # forward maps protein_id -> file path
         try:
-            for _k, _v in stream_parse_idx(forward_path):
+            desc = f"  Reading {index_type} forward index" if show_progress else ""
+            for _k, _v in stream_parse_idx(forward_path, show_progress=show_progress, desc=desc):
                 num_proteins_forward += 1
         except Exception:
             # Be robust if malformed
@@ -195,7 +216,8 @@ def compute_index_stats(
 
     if reversed_present:
         seen_files = set()
-        for file_path_str, protein_ids in stream_parse_idx(reversed_path):
+        desc = f"  Reading {index_type} reversed index" if show_progress else ""
+        for file_path_str, protein_ids in stream_parse_idx(reversed_path, show_progress=show_progress, desc=desc):
             seen_files.add(file_path_str)
             # protein_ids can be list or int
             if isinstance(protein_ids, list):
@@ -263,15 +285,17 @@ def compute_global_rollup(per_index_stats: Dict[str, Dict[str, Any]]) -> Dict[st
 # HTML rendering
 # ----------------------------
 
+_REPORT_JS_PATH = Path(__file__).with_name("report.js")
+
+
 def _build_html(summary_payload: Dict[str, Any], report_name: str) -> str:
     data_json = json.dumps(summary_payload)
-    # Simple HTML with embedded JSON and very light UI
-    return f"""
-<!doctype html>
-<html lang=\"en\">
+    report_js = _REPORT_JS_PATH.read_text()
+    return f"""<!doctype html>
+<html lang="en">
 <head>
-  <meta charset=\"utf-8\">
-  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{report_name}</title>
   <style>
     body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }}
@@ -286,104 +310,13 @@ def _build_html(summary_payload: Dict[str, Any], report_name: str) -> str:
     .muted {{ color: #666; }}
     .controls {{ margin: 8px 0; }}
   </style>
-  <script type=\"application/json\" id=\"summary-data\">{data_json}</script>
+  <script type="application/json" id="summary-data">{data_json}</script>
   <script>
-    function $(id) {{ return document.getElementById(id); }}
-    function render() {{
-      const payload = JSON.parse($("summary-data").textContent);
-      const root = $("root");
-      root.innerHTML = '';
-      const header = document.createElement('div');
-      header.innerHTML = `<h2>${{payload.dataset.identity.folder_name}}</h2><div class=\"muted\">${{payload.dataset.path}}</div>`;
-      root.appendChild(header);
-
-      // Index discovery summary
-      const disc = document.createElement('div');
-      disc.className = 'panel';
-      disc.innerHTML = '<h3>Index discovery</h3>';
-      const ul = document.createElement('ul');
-      for (const [t, p] of Object.entries(payload.index_paths)) {{
-        const li = document.createElement('li');
-        const fwd = p.forward ? 'present' : 'missing';
-        const rev = p.reversed ? 'present' : 'missing';
-        li.textContent = `${{t}}: forward=${{fwd}}, reversed=${{rev}}`;
-        ul.appendChild(li);
-      }}
-      disc.appendChild(ul);
-      root.appendChild(disc);
-
-      // Per-index panels
-      for (const [t, stats] of Object.entries(payload.per_index)) {{
-        const panel = document.createElement('div');
-        panel.className = 'panel';
-        const badges = `
-          <span class=\"badge ${{stats.forward_present ? 'ok' : 'no'}}\">forward</span>
-          <span class=\"badge ${{stats.reversed_present ? 'ok' : 'no'}}\">reversed</span>`;
-        panel.innerHTML = `<h3>${{t}}</h3>${{badges}}
-          <div class=\"muted\">proteins_forward=${{stats.num_proteins_forward}}, files_referenced=${{stats.num_files_referenced}}, edges_reversed=${{stats.num_edges_reversed}}`;
-
-        const ds = stats.by_dataset || {{}};
-        const keys = Object.keys(ds);
-        if (keys.length) {{
-          const table = document.createElement('table');
-          table.innerHTML = '<thead><tr><th>dataset slug</th><th>files referenced</th><th>proteins referencing</th></tr></thead>';
-          const tbody = document.createElement('tbody');
-          for (const slug of keys.sort()) {{
-            const row = document.createElement('tr');
-            row.innerHTML = `<td>${{slug}}</td><td>${{ds[slug].files_referenced||0}}</td><td>${{ds[slug].proteins_referencing||0}}</td>`;
-            tbody.appendChild(row);
-          }}
-          table.appendChild(tbody);
-          panel.appendChild(table);
-
-          const details = document.createElement('details');
-          details.innerHTML = '<summary>Show batches per dataset</summary>';
-          for (const slug of keys.sort()) {{
-            const sub = document.createElement('div');
-            const batches = ds[slug].files_per_batch || {{}};
-            const subt = document.createElement('table');
-            subt.innerHTML = '<thead><tr><th>dataset slug</th><th>batch id</th><th>files</th></tr></thead>';
-            const sb = document.createElement('tbody');
-            for (const [b, n] of Object.entries(batches)) {{
-              const r = document.createElement('tr');
-              r.innerHTML = `<td>${{slug}}</td><td>${{b}}</td><td>${{n}}</td>`;
-              sb.appendChild(r);
-            }}
-            subt.appendChild(sb);
-            sub.appendChild(subt);
-            details.appendChild(sub);
-          }}
-          panel.appendChild(details);
-        }} else {{
-          const em = document.createElement('div');
-          em.className = 'muted';
-          em.textContent = 'No reversed references';
-          panel.appendChild(em);
-        }}
-        root.appendChild(panel);
-      }}
-
-      // Global rollup
-      const roll = document.createElement('div');
-      roll.className = 'panel';
-      roll.innerHTML = '<h3>Global rollup</h3>';
-      const table = document.createElement('table');
-      table.innerHTML = '<thead><tr><th>dataset slug</th><th>files referenced</th><th>proteins referencing</th></tr></thead>';
-      const tb = document.createElement('tbody');
-      for (const row of payload.global.top) {{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${{row.slug}}</td><td>${{row.files_referenced}}</td><td>${{row.proteins_referencing}}</td>`;
-        tb.appendChild(tr);
-      }}
-      table.appendChild(tb);
-      roll.appendChild(table);
-      root.appendChild(roll);
-    }}
-    window.addEventListener('DOMContentLoaded', render);
+{report_js}
   </script>
 </head>
 <body>
-  <div id=\"root\"></div>
+  <div id="root"></div>
 </body>
 </html>
 """
@@ -413,18 +346,24 @@ def export_index_view(
     index_paths = find_index_files(meta.path)
     selected_types = index_types or list(index_paths.keys())
     per_index: Dict[str, Dict[str, Any]] = {}
-    for t in selected_types:
+    
+    print(f"Processing dataset: {meta.identity.folder_name()}")
+    print(f"Index types to process: {', '.join(selected_types)}")
+    
+    for t in tqdm(selected_types, desc="Processing indexes", unit="index", position=0):
         paths = index_paths.get(t)
         if not paths:
             continue
-        stats = compute_index_stats(t, paths.forward, paths.reversed)
+        stats = compute_index_stats(t, paths.forward, paths.reversed, show_progress=True)
         # Mark is_self
         for slug, entry in stats.get("by_dataset", {}).items():
             entry["is_self"] = slug == meta.identity.slug
         per_index[t] = stats
 
+    print("Computing global rollup...")
     global_rollup = compute_global_rollup(per_index)
 
+    print("Building report payload...")
     payload = {
         "dataset": {
             "identity": {
@@ -442,7 +381,11 @@ def export_index_view(
 
     reports_dir = (output_dir or (Path(__file__).resolve().parents[2] / "reports")).resolve()
     out_file = reports_dir / f"{meta.path.name}.html"
+    
+    print(f"Rendering HTML report to: {out_file}")
     render_html(payload, out_file, meta.identity.folder_name())
+    
+    print(f"✓ Report generated successfully: {out_file}")
     return out_file
 
 

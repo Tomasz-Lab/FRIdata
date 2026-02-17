@@ -1,0 +1,71 @@
+function $(id) { return document.getElementById(id); }
+
+function render() {
+  const payload = JSON.parse($("summary-data").textContent);
+  const root = $("root");
+  root.innerHTML = '';
+  const header = document.createElement('div');
+  header.innerHTML = `<h2>${payload.dataset.identity.folder_name}</h2><div class="muted">${payload.dataset.path}</div>`;
+  root.appendChild(header);
+
+  // Per-index panels
+  for (const [t, stats] of Object.entries(payload.per_index)) {
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.innerHTML = `<h3>${t}</h3>
+      <div class="muted">proteins: ${stats.num_proteins_forward}, files referenced: ${stats.num_files_referenced}`;
+
+    const ds = stats.by_dataset || {};
+    const keys = Object.keys(ds);
+    if (keys.length) {
+      const table = document.createElement('table');
+      table.innerHTML = '<thead><tr><th>dataset slug</th><th>files referenced</th><th>proteins referencing</th></tr></thead>';
+      const tbody = document.createElement('tbody');
+      for (const slug of keys.sort()) {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${slug}</td><td>${ds[slug].files_referenced||0}</td><td>${ds[slug].proteins_referencing||0}</td>`;
+        tbody.appendChild(row);
+      }
+      table.appendChild(tbody);
+      panel.appendChild(table);
+
+      const details = document.createElement('details');
+      details.innerHTML = '<summary>Show batches per dataset</summary>';
+      for (const slug of keys.sort()) {
+        const sub = document.createElement('div');
+        const batches = ds[slug].files_per_batch || {};
+        const subt = document.createElement('table');
+        subt.innerHTML = '<thead><tr><th>dataset slug</th><th>batch id</th><th>files</th></tr></thead>';
+        const sb = document.createElement('tbody');
+        for (const [b, n] of Object.entries(batches)) {
+          const r = document.createElement('tr');
+          r.innerHTML = `<td>${slug}</td><td>${b}</td><td>${n}</td>`;
+          sb.appendChild(r);
+        }
+        subt.appendChild(sb);
+        sub.appendChild(subt);
+        details.appendChild(sub);
+      }
+      panel.appendChild(details);
+    }
+    root.appendChild(panel);
+  }
+
+  // Global rollup
+  const roll = document.createElement('div');
+  roll.className = 'panel';
+  roll.innerHTML = '<h3>Global rollup</h3>';
+  const table = document.createElement('table');
+  table.innerHTML = '<thead><tr><th>dataset slug</th><th>files referenced</th><th>proteins referencing</th></tr></thead>';
+  const tb = document.createElement('tbody');
+  for (const row of payload.global.top) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.slug}</td><td>${row.files_referenced}</td><td>${row.proteins_referencing}</td>`;
+    tb.appendChild(tr);
+  }
+  table.appendChild(tb);
+  roll.appendChild(table);
+  root.appendChild(roll);
+}
+
+window.addEventListener('DOMContentLoaded', render);
