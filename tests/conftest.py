@@ -54,6 +54,11 @@ def cleanup_dask():
         from dask.distributed import Client, LocalCluster
         import gc
         
+        # Suppress noisy tornado/asyncio shutdown tracebacks
+        logging.getLogger('tornado.application').setLevel(logging.CRITICAL)
+        logging.getLogger('distributed.nanny').setLevel(logging.CRITICAL)
+        logging.getLogger('distributed.process').setLevel(logging.CRITICAL)
+        
         # Close any active clients
         for client in list(Client._instances):
             try:

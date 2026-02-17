@@ -232,7 +232,24 @@ class CommandParser:
             import warnings
             import distributed
             warnings.simplefilter("ignore", distributed.comm.core.CommClosedError)
-            client.close()
+
+            # Suppress noisy tornado/asyncio tracebacks that fire during
+            # nanny shutdown (TimeoutError / CancelledError).  These are
+            # harmless – the work is already done – but alarming for users.
+            logging.getLogger('tornado.application').setLevel(logging.CRITICAL)
+            logging.getLogger('distributed.nanny').setLevel(logging.CRITICAL)
+            logging.getLogger('distributed.process').setLevel(logging.CRITICAL)
+
+            cluster = getattr(client, 'cluster', None)
+            try:
+                client.close()
+            except Exception:
+                pass
+            if cluster is not None:
+                try:
+                    cluster.close()
+                except Exception:
+                    pass
             ds._client = None
 
 def print_exc(e):
