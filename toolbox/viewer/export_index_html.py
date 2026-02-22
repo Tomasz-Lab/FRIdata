@@ -305,9 +305,11 @@ def _build_html(summary_payload: Dict[str, Any], report_name: str) -> str:
     table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
     th, td {{ border: 1px solid #ddd; padding: 6px 8px; text-align: left; }}
     th {{ background: #fafafa; }}
+    tfoot td {{ border-top: 2px solid #bbb; }}
     .panel {{ border: 1px solid #eee; padding: 12px; border-radius: 6px; margin: 12px 0; }}
     details > summary {{ cursor: pointer; }}
     .muted {{ color: #666; }}
+    .pct {{ float: right; color: #999; font-size: 0.9em; }}
     .controls {{ margin: 8px 0; }}
   </style>
   <script type="application/json" id="summary-data">{data_json}</script>

@@ -215,7 +215,7 @@ class CommandParser:
         if is_error:
             logger.info("Error! Exiting...")
         else:
-            logger.info("Computation successfully completed!")
+            logger.info("\nComputation successfully completed!")
 
     def run(self):
         command_method = getattr(self, self.args.command)
