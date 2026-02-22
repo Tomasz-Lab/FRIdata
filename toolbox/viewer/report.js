@@ -20,13 +20,26 @@ function render() {
     if (keys.length) {
       const table = document.createElement('table');
       table.innerHTML = '<thead><tr><th>dataset slug</th><th>files referenced</th><th>proteins referencing</th></tr></thead>';
+      const sorted = keys.sort();
+      let sumFiles = 0, sumProteins = 0;
+      for (const slug of sorted) {
+        sumFiles += ds[slug].files_referenced || 0;
+        sumProteins += ds[slug].proteins_referencing || 0;
+      }
       const tbody = document.createElement('tbody');
-      for (const slug of keys.sort()) {
+      for (const slug of sorted) {
+        const f = ds[slug].files_referenced || 0;
+        const p = ds[slug].proteins_referencing || 0;
+        const fPct = sumFiles ? (f / sumFiles * 100).toFixed(1) : '0.0';
+        const pPct = sumProteins ? (p / sumProteins * 100).toFixed(1) : '0.0';
         const row = document.createElement('tr');
-        row.innerHTML = `<td>${slug}</td><td>${ds[slug].files_referenced||0}</td><td>${ds[slug].proteins_referencing||0}</td>`;
+        row.innerHTML = `<td>${slug}</td><td>${f} <span class="pct">${fPct}%</span></td><td>${p} <span class="pct">${pPct}%</span></td>`;
         tbody.appendChild(row);
       }
       table.appendChild(tbody);
+      const tfoot = document.createElement('tfoot');
+      tfoot.innerHTML = `<tr><td><strong>Total</strong></td><td><strong>${sumFiles}</strong></td><td><strong>${sumProteins}</strong></td></tr>`;
+      table.appendChild(tfoot);
       panel.appendChild(table);
 
       const details = document.createElement('details');
@@ -58,12 +71,22 @@ function render() {
   const table = document.createElement('table');
   table.innerHTML = '<thead><tr><th>dataset slug</th><th>files referenced</th><th>proteins referencing</th></tr></thead>';
   const tb = document.createElement('tbody');
+  let gSumFiles = 0, gSumProteins = 0;
   for (const row of payload.global.top) {
+    gSumFiles += row.files_referenced;
+    gSumProteins += row.proteins_referencing;
+  }
+  for (const row of payload.global.top) {
+    const fPct = gSumFiles ? (row.files_referenced / gSumFiles * 100).toFixed(1) : '0.0';
+    const pPct = gSumProteins ? (row.proteins_referencing / gSumProteins * 100).toFixed(1) : '0.0';
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${row.slug}</td><td>${row.files_referenced}</td><td>${row.proteins_referencing}</td>`;
+    tr.innerHTML = `<td>${row.slug}</td><td>${row.files_referenced} <span class="pct">${fPct}%</span></td><td>${row.proteins_referencing} <span class="pct">${pPct}%</span></td>`;
     tb.appendChild(tr);
   }
   table.appendChild(tb);
+  const gFoot = document.createElement('tfoot');
+  gFoot.innerHTML = `<tr><td><strong>Total</strong></td><td><strong>${gSumFiles}</strong></td><td><strong>${gSumProteins}</strong></td></tr>`;
+  table.appendChild(gFoot);
   roll.appendChild(table);
   root.appendChild(roll);
 }
