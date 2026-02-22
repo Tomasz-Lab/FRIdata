@@ -1,8 +1,8 @@
 from argparse import Namespace
 import json
+import logging
 import sys
 import traceback
-import logging
 from pathlib import Path
 
 from toolbox.models.chains.verify_chains import verify_chains
@@ -10,7 +10,10 @@ from toolbox.models.manage_dataset.distograms.generate_distograms import (
     read_distograms_from_file,
 )
 from toolbox.models.manage_dataset.structures_dataset import FatalDatasetError, StructuresDataset
-from toolbox.models.manage_dataset.utils import (read_pdbs_from_h5, format_time)
+from toolbox.models.manage_dataset.utils import (
+    read_pdbs_from_h5,
+    format_time,
+)
 from toolbox.models.utils.create_client import create_client
 from toolbox.scripts.archive import create_archive
 from toolbox.models.embedding.embedder.embedder_type import EmbedderType
@@ -20,6 +23,9 @@ import time
 from toolbox.utlis.logging import logger
 from toolbox.config import Config
 from toolbox.viewer.export_index_html import export_index_view
+from toolbox.utlis.inspect_h5 import inspect_h5
+from toolbox.utlis.inspect_idx import inspect_idx
+from toolbox.utlis.remove_dataset import remove_dataset
 
 
 class CommandParser:
@@ -166,8 +172,20 @@ class CommandParser:
         self._create_dataset_from_path_()
         create_archive(self.structures_dataset)
 
-    def export_index_view(self):
-        # CLI handler for export-index-view
+    def inspect_h5(self):
+        inspect_h5(
+            Path(self.args.file),
+            mode=getattr(self.args, "mode", "structure"),
+        )
+
+    def inspect_idx(self):
+        inspect_idx(Path(self.args.file))
+
+    def remove_dataset(self):
+        remove_dataset(self.args.name, self.config)
+
+    def create_dashboard(self):
+        # CLI handler for create_dashboard (formerly export_index_view)
         # Uses global config from args/config loaded in fridata.py
         index_types = None
         if hasattr(self.args, 'index_types') and self.args.index_types and self.args.index_types != 'all':

@@ -222,6 +222,39 @@ def create_parser():
     )
     add_common_arguments(create_archive_parser)
 
+    inspect_h5_parser = subparsers.add_parser(
+        "inspect_h5", help="Read h5 file and display in vi editor"
+    )
+    inspect_h5_parser.add_argument(
+        "file",
+        type=pathlib.Path,
+        help="Path to h5 file",
+    )
+    inspect_h5_parser.add_argument(
+        "--mode",
+        choices=["structure", "content", "keys"],
+        default="structure",
+        help="Display mode: structure (groups/datasets/shapes), content (PDB text via read_all_pdbs_from_h5), or keys (protein codes only)",
+    )
+
+    inspect_idx_parser = subparsers.add_parser(
+        "inspect_idx", help="Read idx file (JSON), format as pretty JSON, display in vi"
+    )
+    inspect_idx_parser.add_argument(
+        "file",
+        type=pathlib.Path,
+        help="Path to idx file",
+    )
+
+    remove_dataset_parser = subparsers.add_parser(
+        "remove_dataset", help="Remove all traces of a dataset"
+    )
+    remove_dataset_parser.add_argument(
+        "name",
+        type=str,
+        help="Dataset name (e.g. AFDB-subset--20250609_1333)",
+    )
+
     input_generation_parser = subparsers.add_parser(
         "input_generation", help="Create dataset, generate sequences distograms and embeddings"
     )
@@ -231,35 +264,35 @@ def create_parser():
     add_dataset_parser_arguments(input_generation_parser)
     add_embedder_argument(input_generation_parser, required=True)
 
-    # export_index_view command
-    export_index_parser = subparsers.add_parser(
-        "export_index_view", help="Export single-file HTML report for dataset indexes"
+    # create_dashboard command (formerly export_index_view)
+    create_dashboard_parser = subparsers.add_parser(
+        "create_dashboard", help="Export single-file HTML report for dataset indexes"
     )
-    export_index_parser.add_argument(
+    create_dashboard_parser.add_argument(
         "--dataset",
         type=pathlib.Path,
         default=None,
         help="Path to dataset directory or its dataset.json",
     )
-    export_index_parser.add_argument(
+    create_dashboard_parser.add_argument(
         "--dataset-slug",
         type=str,
         default=None,
         help="Dataset slug (folder suffix after --)",
     )
-    export_index_parser.add_argument(
+    create_dashboard_parser.add_argument(
         "--root",
         type=pathlib.Path,
         default=None,
         help="Override datasets root (default: <data_path>/datasets)",
     )
-    export_index_parser.add_argument(
+    create_dashboard_parser.add_argument(
         "--index-types",
         type=str,
         default="all",
         help="Comma-separated index types (dataset,sequences,coordinates,embeddings,distograms) or 'all'",
     )
-    export_index_parser.add_argument(
+    create_dashboard_parser.add_argument(
         "--output-dir",
         type=pathlib.Path,
         default=None,
