@@ -1,5 +1,4 @@
 import asyncio
-import os
 import shutil
 import tempfile
 import time
@@ -7,7 +6,7 @@ import traceback
 import zlib
 import re
 
-from io import BytesIO, StringIO
+from io import BytesIO
 from itertools import islice
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Iterable
@@ -16,21 +15,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed as futures_as_co
 import biotite.database
 import biotite.database.rcsb
 import biotite.database.afdb
-import dask
 import h5py
 import numpy as np
-from dask.distributed import as_completed as dask_as_completed, worker_client
+from dask.distributed import worker_client
 from foldcomp import foldcomp
 from foldcomp.setup import download
 
-from toolbox.models.manage_dataset.compress_experiment.exp import (
-    compress_and_save_h5_combined_lzf_shuffle,
-    compress_and_save_h5_individual,
-    compress_and_save_h5_individual_lzf,
-    compress_and_save_h5_combined,
-    compress_and_save_h5_combined_lzf,
-    compress_and_save_h5_individual_lzf_shuffle,
-)
+
 from toolbox.models.utils.cif2pdb import cif_to_pdb, binary_cif_to_pdb
 
 from toolbox.utlis.logging import logger
@@ -212,45 +203,6 @@ def compress_and_save_h5(
     total_time = end_time - start_time
     logger.debug(f"Compress time: {format_time(total_time)}")
     return str(pdbs_file)
-
-
-def compress_and_save_experiment(
-    path_for_batch: Path, results: Tuple[List[str], List[str], List[str]]
-):
-    fs = [
-        compress_and_save_h5_individual,
-        compress_and_save_h5_individual_lzf,
-        compress_and_save_h5_individual_lzf_shuffle,
-        compress_and_save_h5_combined,
-        compress_and_save_h5_combined_lzf,
-        compress_and_save_h5_combined_lzf_shuffle,
-        compress_and_save_h5,
-    ]
-
-    descriptions = [
-        "individual gzip",
-        "individual lzf",
-        "individual lzf shuffle",
-        "combined gzip",
-        "combined lzf",
-        "combined lzf shuffle",
-        "combined zlib",
-    ]
-
-    inputs = list(results)
-
-    def get_file_size_mb(file_path):
-        try:
-            size_in_bytes = os.path.getsize(file_path)
-            size_in_mb = size_in_bytes / (1024 * 1024)  # Convert bytes to megabytes
-            return round(size_in_mb, 2)
-        except Exception:
-            return None
-
-    for f, desc in zip(fs, descriptions):
-        logger.debug(desc)
-        path = f(path_for_batch, inputs)
-        logger.debug(f"{path} {get_file_size_mb(path)} MB")
 
 
 def retrieve_pdb_chunk_to_h5(
