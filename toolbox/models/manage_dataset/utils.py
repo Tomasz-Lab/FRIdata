@@ -67,15 +67,15 @@ def retrieve_cif(pdb: str) -> Tuple[Optional[str], str]:
             logger.debug(f"Retrying downloading {pdb} {retry_num}")
 
         try:
-            cif_file_io: StringIO = biotite.database.rcsb.fetch(pdb, "cif")
-            cif_file: str = cif_file_io.getvalue()
+            cif_file_io = biotite.database.rcsb.fetch(pdb, "cif")
+            cif_file = cif_file_io.getvalue()
         except Exception:
             cif_file = None
 
-        if not cif_file:
+        if cif_file is None:
             retry_num += 1
 
-    if retry_num > 3:
+    if cif_file is None:
         logger.warning(f"Failed retrying {pdb}")
         return None, pdb
 
@@ -121,20 +121,20 @@ def retrieve_binary_cif(pdb: str) -> tuple[BytesIO | None, str]:
     retry_num: int = 0
     binary_file_bytes_io: Optional[BytesIO] = None
 
-    while retry_num <= 3 and binary_file_bytes_io is None:
-
+    while retry_num <= 3:
         if retry_num > 0:
             logger.debug(f"Retrying downloading {pdb} {retry_num}")
 
         try:
-            binary_file_bytes_io: BytesIO = biotite.database.rcsb.fetch(pdb, "bcif")
+            binary_file_bytes_io = biotite.database.rcsb.fetch(pdb, "bcif")
         except Exception:
             binary_file_bytes_io = None
 
-        if not binary_file_bytes_io:
-            retry_num += 1
+        if binary_file_bytes_io:
+            break
+        retry_num += 1
 
-    if retry_num > 3:
+    if binary_file_bytes_io is None:
         logger.warning(f"Failed retrying {pdb}")
         return None, pdb
 
