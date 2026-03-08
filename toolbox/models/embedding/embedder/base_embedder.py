@@ -25,8 +25,7 @@ class BaseEmbedder(ABC):
                 batch_index = 0
                 for prot_id, prot_seq in sequences.items():
                     embeddings_pure = self.get_embedding(prot_id, prot_seq)
-                    # Embeddings now include CLS and EOS tokens, so shape[0] = len(seq) + 2
-                    assert len(prot_seq) + 2 == embeddings_pure.shape[0], f'Invalid character in {prot_id}: expected {len(prot_seq) + 2}, got {embeddings_pure.shape[0]}'
+                    assert self.validate_embedding(prot_seq, embeddings_pure), f'Invalid embedding shape for {prot_id}: expected shape[0] to match sequence length'
                     embeddings_pure_batch[prot_id] = embeddings_pure
                     torch.cuda.empty_cache()
                     if len(embeddings_pure_batch) >= self.batch_size:
@@ -48,4 +47,7 @@ class BaseEmbedder(ABC):
             p.join()
             for prot_id in ids:
                 final_index[prot_id] = str(file_path)
-        return final_index 
+        return final_index
+
+    def validate_embedding(self, prot_seq, embeddings):
+        return len(prot_seq) + 2 == embeddings.shape[0]

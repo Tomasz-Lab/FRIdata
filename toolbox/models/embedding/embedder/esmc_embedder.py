@@ -14,9 +14,9 @@ batch_size = 1000
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class ESMCEmbedder(BaseEmbedder):
-    def __init__(self, device=None, batch_size=1000):
+    def __init__(self, device=None, batch_size=1000, model_name="esmc_600m"):
         super().__init__(device, batch_size)
-        self.model = ESMC.from_pretrained("esmc_600m").to(self.device)
+        self.model = ESMC.from_pretrained(model_name).to(self.device)
 
     def get_embedding(self, prot_id, prot_seq):
         protein = ESMProtein(sequence=prot_seq)
