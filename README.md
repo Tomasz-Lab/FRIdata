@@ -84,3 +84,52 @@ PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/fridata.py \
  --input-path ${AFDB_PATH} \
  -e ${EMBEDDER_TYPE}
 ```
+
+## Running on HPC
+
+Running FRIdata on HPC differs on CPU and GPU nodes. This instruction set is valid for HPC hosted in PLGrid infrastructure. Running on other infrastructures may require additional adjustments.
+
+### CPU
+
+Prerequisites:
+- Having active grant valid on the HPC
+- Having a full list of mandatory ENV vars set (ideally in .bashrc):
+    - `DEEPFRI_PATH`: should always refer to a parent directory of this repo
+    - `IDS_PATH`: path to a text file with AFDB indexes listed
+    - `AFDB_PATH`: path to AFDB structures (can be empty directory - structures will be fetched there)
+    - `DATA_PATH`: path to the parent diretory of all generated output data
+    - Optional ENV vars with default values:
+        - `COMMON_SLURM_PATH`: path to common_slurn_cpu.sh, defaults to `$DEEPFRI_PATH/FRIdata/scripts/hpc/cpu/common_slurm_cpu.sh`
+        - `LAUNCH_WORKER_SLURM_PATH`: path to launch_worker_slurm_cpu.sh, defaults to `$DEEPFRI_PATH/FRIdata/scripts/hpc/cpu/launch_workers_slurm_cpu.sh`
+        - `MEMORY_LIMIT`: memory limit per Dask worker, defaults to `288GiB`
+        - `IP_INTERFACE`: network unix interface, where dask workers are connected. Defaults to `ens1f0`
+        - `CONDA_ENV_PATH`: path to conda environment, defaults to `$DEEPFRI_PATH/conda_dev`
+- Have installed module miniconda3
+- Have installed module gcc
+
+Steps:
+
+1. Download the repo
+
+```
+git clone https://github.com/Tomasz-Lab/FRIdata.git
+cd FRIdata
+```
+
+2. Update run permissions
+
+```
+chmod u+x -R scripts/hpc/cpu
+```
+
+3. Run `initialize_slurm_cpu.sh`. As an argument put the path into directory, where `.conda` directory should be installed and specify `--cpu` flag
+
+```
+./scripts/hpc/cpu/initialize_slurm_cpu.sh <path to .conda> --cpu
+```
+
+4. Schedule SBatch script into the HPC with all the args specified
+
+```
+sbatch --cpus-per-task=<cpus> --time=<HH:MM:SS> --nodes=<nodes> --account=<grant name> scripts/hpc/cpu/run_slurm_cpu.sh
+```
