@@ -37,7 +37,24 @@ fi
 
 CONDA_DIR="$GROUP_DIR/.conda"
 
-module load miniconda3
+# Try loading a Conda/Miniconda module in a robust way (handle varied names)
+LOADED_MODULE=false
+if command -v module >/dev/null 2>&1; then
+    MODULE_CANDIDATES=(miniconda3 Miniconda3 miniconda Anaconda3 anaconda3)
+    for MOD in "${MODULE_CANDIDATES[@]}"; do
+        if module load "$MOD" >/dev/null 2>&1; then
+            echo "Loaded module: $MOD"
+            LOADED_MODULE=true
+            break
+        fi
+    done
+fi
+
+if [ "$LOADED_MODULE" = false ]; then
+    echo "Error: Could not load a Conda module."
+    exit 1
+fi
+
 conda config --add pkgs_dirs "$CONDA_DIR"
 
 # Create environment from base YAML (without PyTorch)
@@ -45,7 +62,8 @@ conda env create --prefix $CONDA_ENV_PATH --file "$DEEPFRI_PATH/FRIdata/toolbox_
 
 conda config --set auto_activate_base false
 
-source activate $CONDA_ENV_PATH
+eval "$(conda shell.bash hook)"
+conda activate $CONDA_ENV_PATH
 
 # Install PyTorch based on mode
 if [ "$CPU_ONLY" = true ]; then

@@ -90,8 +90,6 @@ PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/fridata.py \
 
 Running FRIdata on HPC differs on CPU and GPU nodes. This instruction set is valid for HPC hosted in PLGrid infrastructure. Running on other infrastructures may require additional adjustments.
 
-### CPU
-
 Prerequisites:
 - Having active grant valid on the HPC
 - Having a full list of mandatory ENV vars set (ideally in .bashrc):
@@ -100,8 +98,8 @@ Prerequisites:
     - `AFDB_PATH`: path to AFDB structures (can be empty directory - structures will be fetched there)
     - `DATA_PATH`: path to the parent diretory of all generated output data
     - Optional ENV vars with default values:
-        - `COMMON_SLURM_PATH`: path to common_slurn_cpu.sh, defaults to `$DEEPFRI_PATH/FRIdata/scripts/hpc/cpu/common_slurm_cpu.sh`
-        - `LAUNCH_WORKER_SLURM_PATH`: path to launch_worker_slurm_cpu.sh, defaults to `$DEEPFRI_PATH/FRIdata/scripts/hpc/cpu/launch_workers_slurm_cpu.sh`
+        - `COMMON_SLURM_PATH`: path to common_slurn.sh, defaults to `$DEEPFRI_PATH/FRIdata/scripts/hpc/common_slurm.sh`
+        - `LAUNCH_WORKER_SLURM_PATH`: path to launch_worker_slurm.sh, defaults to `$DEEPFRI_PATH/FRIdata/scripts/hpc/launch_workers_slurm.sh`
         - `MEMORY_LIMIT`: memory limit per Dask worker, defaults to `288GiB`
         - `IP_INTERFACE`: network unix interface, where dask workers are connected. Defaults to `ens1f0`
         - `CONDA_ENV_PATH`: path to conda environment, defaults to `$DEEPFRI_PATH/conda_dev`
@@ -123,14 +121,21 @@ cd FRIdata
 chmod u+x -R scripts/hpc/cpu
 ```
 
-3. Run `initialize_slurm_cpu.sh`. As an argument put the path into directory, where `.conda` directory should be installed and specify `--cpu` flag
+3. Run `initialize_slurm.sh`. As an argument put the path into directory, where `.conda` directory should be installed and specify `--cpu` flag if the script is run on CPU cluster.
 
 ```
-./scripts/hpc/cpu/initialize_slurm_cpu.sh <path to .conda> --cpu
+./scripts/hpc/initialize_slurm.sh <path to .conda> [--cpu]
 ```
 
-4. Schedule SBatch script into the HPC with all the args specified
+4. Schedule SBatch script into the HPC with all the args specified. Operations to be chosen are: `sequences`, `coordinates`, `embeddings`
 
+
+For CPU:
 ```
-sbatch --cpus-per-task=<cpus> --time=<HH:MM:SS> --nodes=<nodes> --account=<grant name> scripts/hpc/cpu/run_slurm_cpu.sh
+sbatch --cpus-per-task=<cpus> --time=<HH:MM:SS> --nodes=<nodes> --account=<grant name> scripts/hpc/run_slurm.sh sequences,coordinates
+```
+
+For GPU:
+```
+sbatch --gres=gpu[:gpu-number] --time=<HH:MM:SS> --account=<grant name> --nodes=1 --partition=<partition name> --cpus-per-task=<cpus> scripts/hpc/run_slurm.sh embeddings
 ```
