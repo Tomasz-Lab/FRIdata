@@ -115,6 +115,13 @@ def add_embedder_argument(parser, required=True):
     )
 
 
+def _parse_comma_separated_pdb_names(value: str) -> list[str]:
+    names = [s.strip() for s in value.split(",") if s.strip()]
+    if not names:
+        raise argparse.ArgumentTypeError("--name requires at least one non-empty PDB key")
+    return names
+
+
 def configure_logging(verbose, log_file=None):
     """Configure logging based on verbose flag and optional log file"""
     log_level = logging.DEBUG if verbose else logging.INFO
@@ -234,7 +241,18 @@ def create_parser():
         "--mode",
         choices=["structure", "content", "keys"],
         default="structure",
-        help="Display mode: structure (groups/datasets/shapes), content (PDB text via read_all_pdbs_from_h5), or keys (protein codes only)",
+        help="Display mode: structure (groups/datasets/shapes), content (PDB text via read_pdbs_from_h5), or keys (protein codes only)",
+    )
+    inspect_h5_parser.add_argument(
+        "--name",
+        dest="pdb_names",
+        type=_parse_comma_separated_pdb_names,
+        default=None,
+        metavar="KEYS",
+        help=(
+            "Comma-separated PDB keys to show (content mode only; must match keys in the H5). "
+            "Use inspect_h5 --mode keys to list keys."
+        ),
     )
 
     inspect_idx_parser = subparsers.add_parser(
@@ -307,7 +325,11 @@ def create_parser():
 def main():
     parser = create_parser()
     args = parser.parse_args()
-    
+
+    if args.command == "inspect_h5" and getattr(args, "pdb_names", None) is not None:
+        if args.mode != "content":
+            parser.error("--name is only valid with --mode content")
+
     # Load config and raise if not found
     from toolbox.config import load_config
     try:

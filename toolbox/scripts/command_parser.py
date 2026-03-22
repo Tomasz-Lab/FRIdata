@@ -176,6 +176,7 @@ class CommandParser:
         inspect_h5(
             Path(self.args.file),
             mode=getattr(self.args, "mode", "structure"),
+            names=getattr(self.args, "pdb_names", None),
         )
 
     def inspect_idx(self):
