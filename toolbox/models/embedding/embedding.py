@@ -66,9 +66,9 @@ class Embedding:
         if self.structures_dataset.embedder_type is None:
             self.structures_dataset.embedder_type = EmbedderType.ESM2_T33_650M
         
-        # Get the embedder class and create an instance
-        embedder_class = self.structures_dataset.embedder_type.embedder_class
-        index_of_new_embeddings = embedder_class().embed(sequences, self.outputs_dir)
+        # Get the embedder instance and run embedding
+        embedder = self.structures_dataset.embedder_type.create_embedder()
+        index_of_new_embeddings = embedder.embed(sequences, self.outputs_dir)
 
         present_embeddings.update(index_of_new_embeddings)
 
