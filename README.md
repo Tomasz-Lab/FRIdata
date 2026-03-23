@@ -76,7 +76,7 @@ EMBEDDER_TYPE=esm2_t33_650M_UR50D
 export KMP_DUPLICATE_LIB_OK=TRUE
 
 PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/fridata.py \
- input_generation \
+ generate_data \
  -t sequences,coordinates,distograms,embeddings \
  -d AFDB \
  -c subset \

@@ -8,6 +8,6 @@ fi
 
 source $COMMON_SLURM_PATH/common_slurm_cpu.sh
 
-PYTHON_COMMAND="PYTHONPATH='.' python3 -u ${DEEPFRI_PATH}/FRIdata/fridata.py input_generation -t sequences,coordinates -d AFDB -c subset --overwrite --version 1_test_dask -i ${IDS_PATH} --input-path ${AFDB_PATH} -e ${EMBEDDER_TYPE} --slurm --verbose"
+PYTHON_COMMAND="PYTHONPATH='.' python3 -u ${DEEPFRI_PATH}/FRIdata/fridata.py generate_data -t sequences,coordinates -d AFDB -c subset --overwrite --version 1_test_dask -i ${IDS_PATH} --input-path ${AFDB_PATH} -e ${EMBEDDER_TYPE} --slurm --verbose"
 
 start_computation "$PYTHON_COMMAND"

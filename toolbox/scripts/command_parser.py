@@ -70,14 +70,12 @@ class CommandParser:
             # Log the complete command line for dataset operations
             self._log_command()
 
-    def dataset(self):
+
+    def _build_structures_dataset_from_args(self) -> StructuresDataset:
+        """Build StructuresDataset from CLI args. Used by create_dataset and generate_data."""
         from toolbox.models.embedding.embedder.embedder_type import EmbedderType
         from toolbox.models.manage_dataset.structures_dataset import StructuresDataset
-        from toolbox.models.manage_dataset.utils import format_time
-
-        start = time.time()
-
-        # Convert embedder string to EmbedderType enum if provided
+        
         embedder_type = None
         if hasattr(self.args, "embedder") and self.args.embedder:
             for embedder_enum in EmbedderType:
@@ -85,7 +83,7 @@ class CommandParser:
                     embedder_type = embedder_enum
                     break
 
-        dataset = StructuresDataset(
+        return StructuresDataset(
             db_type=self.args.db,
             collection_type=self.args.collection,
             proteome=self.args.proteome,
@@ -104,6 +102,13 @@ class CommandParser:
             config=self.config,
             embedder_type=embedder_type,
         )
+
+    def create_dataset(self):
+        from toolbox.models.manage_dataset.utils import format_time
+        
+        start = time.time()
+
+        dataset = self._build_structures_dataset_from_args()
         self.structures_dataset = dataset
 
         # Configure logging to dataset log file if not already specified
@@ -228,14 +233,37 @@ class CommandParser:
         )
         logger.info(f"Report generated: {out_path}")
 
-    def input_generation(self):
+
+    def generate_data(self):
         from toolbox.models.manage_dataset.structures_dataset import FatalDatasetError
         from toolbox.models.manage_dataset.utils import format_time
-
+        
         total_time = time.time()
         is_error = False
+
+        # Parse -t/--type: empty, "all" -> run all steps; otherwise run only specified
+        type_arg = getattr(self.args, 'type', None) or ""
+        type_arg = (type_arg or "").strip().lower()
+        run_all = type_arg in ("", "all")
+        if run_all:
+            selected = {"dataset", "sequences", "coordinates", "distograms", "embeddings"}
+        else:
+            selected = {s.strip().lower() for s in type_arg.split(",") if s.strip()}
+            valid = {"dataset", "sequences", "coordinates", "distograms", "embeddings"}
+            invalid = selected - valid
+            if invalid:
+                logger.warning(f"Ignoring unknown -t values: {invalid}")
+
+        # Step 1: dataset
+        run_dataset = "dataset" in selected or run_all
         try:
-            self.dataset()
+            if run_dataset:
+                self.create_dataset()
+            else:
+                self.structures_dataset = self._build_structures_dataset_from_args()
+                self.structures_dataset.add_client()
+                self._configure_dataset_logging()
+
         except FatalDatasetError as e:
             logger.error("Fatal error! Exiting...")
             logger.error(e)
@@ -243,21 +271,31 @@ class CommandParser:
         except Exception as e:
             print_exc(e)
             is_error = True
-        try:
-            self.structures_dataset.extract_sequence_and_coordinates()
-        except Exception as e:
-            print_exc(e)
-            is_error = True
-        try:
-            self.structures_dataset.generate_distograms()
-        except Exception as e:
-            print_exc(e)
-            is_error = True
-        try:
-            self.structures_dataset.generate_embeddings()
-        except Exception as e:
-            print_exc(e)
-            is_error = True
+
+        # Step 2: sequences and coordinates (single step produces both)
+        if "sequences" in selected or "coordinates" in selected or run_all:
+            try:
+                self.structures_dataset.extract_sequence_and_coordinates()
+            except Exception as e:
+                print_exc(e)
+                is_error = True
+
+        # Step 3: distograms
+        if "distograms" in selected or run_all:
+            try:
+                self.structures_dataset.generate_distograms()
+            except Exception as e:
+                print_exc(e)
+                is_error = True
+
+        # Step 4: embeddings
+        if "embeddings" in selected or run_all:
+            try:
+                self.structures_dataset.generate_embeddings()
+            except Exception as e:
+                print_exc(e)
+                is_error = True
+
         end_time = time.time()
         logger.info(f"Total time for all steps: {format_time(end_time - total_time)}")
         if is_error:

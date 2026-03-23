@@ -46,7 +46,7 @@ def add_dataset_parser_arguments(parser):
         required=False,
         default="",
         metavar="name",
-        help="Inputs to generate",
+        help="Comma-separated types to generate: dataset, sequences, coordinates, distograms, embeddings; or 'all'. For generate_data only; ignored by create_dataset.",
         nargs="?",
     )
     parser.add_argument(
@@ -160,7 +160,7 @@ def create_parser():
 
     subparsers = parser.add_subparsers(dest="command", help="Sub-command help")
 
-    parser_dataset = subparsers.add_parser("dataset", help="Create protein dataset")
+    parser_dataset = subparsers.add_parser("create_dataset", help="Create protein dataset")
     parser_dataset.add_argument(
         "--slurm", action="store_true", help="Use SLURM job scheduler"
     )
@@ -273,14 +273,14 @@ def create_parser():
         help="Dataset name (e.g. AFDB-subset--20250609_1333)",
     )
 
-    input_generation_parser = subparsers.add_parser(
-        "input_generation", help="Create dataset, generate sequences distograms and embeddings"
+    generate_data_parser = subparsers.add_parser(
+        "generate_data", help="Create dataset, generate sequences distograms and embeddings"
     )
-    input_generation_parser.add_argument(
+    generate_data_parser.add_argument(
         "--slurm", action="store_true", help="Use SLURM job scheduler"
     )
-    add_dataset_parser_arguments(input_generation_parser)
-    add_embedder_argument(input_generation_parser, required=True)
+    add_dataset_parser_arguments(generate_data_parser)
+    add_embedder_argument(generate_data_parser, required=True)
 
     # create_dashboard command (formerly export_index_view)
     create_dashboard_parser = subparsers.add_parser(
