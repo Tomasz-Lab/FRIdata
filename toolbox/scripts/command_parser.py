@@ -34,6 +34,9 @@ class CommandParser:
                 (path / "dataset.json").read_text()
             )
         elif path.is_file():
+            if path.suffix != ".json":
+                logger.error("Dataset path is not valid")
+                raise FileNotFoundError
             self.structures_dataset = StructuresDataset.model_validate_json(
                 path.read_text()
             )
