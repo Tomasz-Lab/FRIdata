@@ -3,10 +3,11 @@
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Optional, Sequence
 
 import h5py
 
-from toolbox.models.manage_dataset.utils import read_all_pdbs_from_h5
+from toolbox.models.manage_dataset.utils import read_pdbs_from_h5
 from toolbox.utlis.logging import logger
 
 
@@ -23,13 +24,19 @@ def _inspect_in_vi(content: str) -> None:
         Path(tmp_path).unlink(missing_ok=True)
 
 
-def inspect_h5(path: Path, mode: str = "structure") -> None:
+def inspect_h5(
+    path: Path,
+    mode: str = "structure",
+    names: Optional[Sequence[str]] = None,
+) -> None:
     """Read h5 file and display in vi editor.
 
     Args:
         path: Path to the HDF5 file.
         mode: Display mode - 'structure' (groups/datasets/shapes), 'content'
-            (PDB text via read_all_pdbs_from_h5), or 'keys' (protein codes only).
+            (PDB text via read_pdbs_from_h5), or 'keys' (protein codes only).
+        names: When mode is 'content', optional list of PDB keys to include (exact
+            match). Order in the buffer follows this list. Ignored for other modes.
     """
     if not path.exists():
         logger.error(f"File not found: {path}")
@@ -55,14 +62,29 @@ def inspect_h5(path: Path, mode: str = "structure") -> None:
 
         content = "\n".join(lines)
     elif mode == "content":
-        pdbs = read_all_pdbs_from_h5(str(path))
+        codes = list(names) if names else None
+        pdbs = read_pdbs_from_h5(str(path), codes)
         if pdbs is None:
             logger.error("Failed to read h5 file")
             return
-        for code, pdb_text in pdbs.items():
-            lines.append(f"=== {code} ===")
-            lines.append(pdb_text)
-            lines.append("")
+        if codes:
+            missing = set(codes) - set(pdbs.keys())
+            if missing:
+                logger.warning(
+                    "PDB keys not found in h5 (skipped): %s",
+                    ", ".join(sorted(missing)),
+                )
+            for code in codes:
+                if code not in pdbs:
+                    continue
+                lines.append(f"=== {code} ===")
+                lines.append(pdbs[code])
+                lines.append("")
+        else:
+            for code, pdb_text in pdbs.items():
+                lines.append(f"=== {code} ===")
+                lines.append(pdb_text)
+                lines.append("")
         content = "\n".join(lines)
     else:
         with h5py.File(path, "r") as hf:

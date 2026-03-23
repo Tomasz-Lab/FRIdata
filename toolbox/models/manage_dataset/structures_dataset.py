@@ -40,7 +40,6 @@ from toolbox.models.manage_dataset.utils import (
     chunk
 )
 from toolbox.models.manage_dataset.distograms.generate_distograms import generate_distograms
-from toolbox.models.embedding.embedding import Embedding
 from toolbox.models.utils.from_archive import extract_batch_from_archive
 from toolbox.models.utils.create_client import create_client, total_workers
 from toolbox.utlis.filter_pdb_codes import filter_pdb_codes
@@ -613,6 +612,8 @@ class StructuresDataset(BaseModel):
 
     def generate_embeddings(self):
         """Generate embeddings for the dataset."""
+        from toolbox.models.embedding.embedding import Embedding
+
         embedding = Embedding(self)
         embedding.run()
 
