@@ -1,0 +1,9 @@
+# include everything in the sdist (be careful — this will bundle all files)
+global-include *
+
+recursive-exclude tests *
+recursive-exclude .github *
+recursive-exclude .pytest_cache *
+recursive-exclude build *
+recursive-exclude *.egg-info *
+recursive-exclude dist *

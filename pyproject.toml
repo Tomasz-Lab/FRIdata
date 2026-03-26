@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "FRIdata"
+version = "0.1.0"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "foldcomp",
+    "pydantic>=2.8.2",
+    "scipy>=1.14.0",
+    "h5py",
+    "matplotlib",
+    "biotite>=0.41.2",
+    "numpy>=1.26.4,<1.27.0",
+    "genson",
+    "bs4",
+    "bio~=1.7.0",
+    "pytest",
+    "pytest-order",
+    "dask>=2024.4.2,<2025.0.0",
+    "dask[dataframe]",
+    "distributed>=2024.4.2,<2025.0.0",
+    "python-dotenv",
+    "tables",
+    "biopython",
+    "bokeh>=2.4.2,<3.0.0",
+    "pdbfixer",
+    "mamba",
+    "transformers",
+    "tqdm",
+    "pytorch-gpu",
+    "esm"
+]
+
+[project.scripts]
+fridata = "fridata:main"
+
+[tool.setuptools]
+# fridata.py is a single-module at project root; install as py-module
+py-modules = ["fridata"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["toolbox*"]
