@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from toolbox.config import Config
+from toolbox.models.manage_dataset.index.handle_index import read_index
 from toolbox.utlis.logging import logger
 
 if TYPE_CHECKING:
@@ -233,11 +234,18 @@ class CommandParser:
         )
         logger.info(f"Report generated: {out_path}")
 
+    def _finish_generate_data(self, started_at: float, is_error: bool) -> None:
+        from toolbox.models.manage_dataset.utils import format_time
+
+        logger.info(f"Total time for all steps: {format_time(time.time() - started_at)}")
+        if is_error:
+            logger.info("Error! Exiting...")
+        else:
+            logger.info("\nComputation successfully completed!")
 
     def generate_data(self):
         from toolbox.models.manage_dataset.structures_dataset import FatalDatasetError
-        from toolbox.models.manage_dataset.utils import format_time
-        
+
         total_time = time.time()
         is_error = False
 
@@ -267,23 +275,65 @@ class CommandParser:
         except FatalDatasetError as e:
             logger.error("Fatal error! Exiting...")
             logger.error(e)
+            self._finish_generate_data(total_time, is_error=True)
             return
         except Exception as e:
             print_exc(e)
             is_error = True
 
+        ds = self.structures_dataset
+        needs_structure_index = (
+            "sequences" in selected
+            or "coordinates" in selected
+            or "distograms" in selected
+            or "embeddings" in selected
+            or run_all
+        )
+        if ds is None:
+            if needs_structure_index:
+                logger.error(
+                    "Dataset setup did not complete; cannot run sequences, coordinates, "
+                    "distograms, or embeddings. See earlier traceback if an exception was logged."
+                )
+            self._finish_generate_data(total_time, is_error=True)
+            return
+
+        if needs_structure_index and not run_dataset:
+            idx_path = ds.dataset_index_file_path()
+            if not idx_path.exists():
+                logger.error(
+                    "Dataset index not found: %s. Run generate_data with 'dataset' in -t "
+                    "(e.g. -t dataset,sequences,...) or run create_dataset first so the structure index is created.",
+                    idx_path.resolve(),
+                )
+                self._finish_generate_data(total_time, is_error=True)
+                return
+
         # Step 2: sequences and coordinates (single step produces both)
         if "sequences" in selected or "coordinates" in selected or run_all:
+            sequences_and_coordinates_ok = False
             try:
-                self.structures_dataset.extract_sequence_and_coordinates()
+                ds.extract_sequence_and_coordinates()
+                sequences_and_coordinates_ok = True
             except Exception as e:
                 print_exc(e)
                 is_error = True
+            if sequences_and_coordinates_ok:
+                seq_idx = read_index(
+                    ds.sequences_index_path(),
+                    ds.config.data_path,
+                )
+                if len(seq_idx) == 0:
+                    logger.error(
+                        "No proteins to process after sequences/coordinates step; skipping distograms and embeddings."
+                    )
+                    self._finish_generate_data(total_time, is_error=True)
+                    return
 
         # Step 3: distograms
         if "distograms" in selected or run_all:
             try:
-                self.structures_dataset.generate_distograms()
+                ds.generate_distograms()
             except Exception as e:
                 print_exc(e)
                 is_error = True
@@ -291,17 +341,12 @@ class CommandParser:
         # Step 4: embeddings
         if "embeddings" in selected or run_all:
             try:
-                self.structures_dataset.generate_embeddings()
+                ds.generate_embeddings()
             except Exception as e:
                 print_exc(e)
                 is_error = True
 
-        end_time = time.time()
-        logger.info(f"Total time for all steps: {format_time(end_time - total_time)}")
-        if is_error:
-            logger.info("Error! Exiting...")
-        else:
-            logger.info("\nComputation successfully completed!")
+        self._finish_generate_data(total_time, is_error)
 
     def run(self):
         command_method = getattr(self, self.args.command)

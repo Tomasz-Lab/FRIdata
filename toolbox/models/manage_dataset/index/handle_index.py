@@ -15,8 +15,19 @@ def read_index(index_file_path: Path, data_path: str) -> Dict[str, str]:
             else:
                 index = {k: data_path + "/" + v for k, v in index.items()}
             return index
-    except Exception as e:
-        logger.error("Exception in read_index", e)
+    except FileNotFoundError:
+        resolved = index_file_path.resolve()
+        if index_file_path.name == "dataset.idx":
+            logger.error(
+                "Dataset index not found: %s. Run generate_data with 'dataset' in -t "
+                "(e.g. -t dataset,sequences,...) or run create_dataset first so the structure index is created.",
+                resolved,
+            )
+        else:
+            logger.error("Index file not found: %s", resolved)
+        return {}
+    except Exception:
+        logger.exception("read_index failed for %s", index_file_path)
         return {}
 
 
@@ -40,5 +51,5 @@ def add_new_files_to_index(dataset_index_file_path: Path, new_files_index: Dict,
         current_index = read_index(dataset_index_file_path, data_path)
         current_index.update(new_files_index)
         create_index(dataset_index_file_path, current_index, data_path)
-    except Exception as e:
-        logger.error("Exception in add_new_files_to_index", e)
+    except Exception:
+        logger.exception("add_new_files_to_index failed for %s with error: %s", dataset_index_file_path, e)
