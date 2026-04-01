@@ -1,14 +1,9 @@
 import os
-import shutil
 import time
-from typing import Iterable, List, Optional, Tuple, Dict
+from typing import Iterable, List, Optional, Tuple, Dict, Pattern
 import zipfile
 import tarfile
 from pathlib import Path
-
-from glob import iglob
-
-from tqdm import tqdm
 
 from dask.distributed import worker_client
 from toolbox.models.manage_dataset.index.handle_index import add_new_files_to_index, create_index
@@ -65,6 +60,74 @@ def is_archive(path):
     return zipfile.is_zipfile(path) or tarfile.is_tarfile(path)
 
 
+def build_stem_to_paths(extracted_path: Path) -> Dict[str, List[Path]]:
+    """
+    Collect all .pdb / .cif under extracted_path, keyed by filename stem.
+    Paths are resolved to absolute for reliable opening (archive vs directory).
+    """
+    stem_to_paths: Dict[str, List[Path]] = {}
+    base = extracted_path.resolve()
+    if not base.exists():
+        return stem_to_paths
+    for pattern in ("*.pdb", "*.cif"):
+        for p in base.rglob(pattern):
+            if not p.is_file():
+                continue
+            resolved = p.resolve()
+            stem_to_paths.setdefault(resolved.stem, []).append(resolved)
+    return stem_to_paths
+
+
+def _pick_path_prefer_cif(paths: List[Path]) -> Path:
+    """If both .cif and .pdb exist for the same stem, prefer .cif."""
+    cifs = [p for p in paths if p.suffix.lower() == ".cif"]
+    if cifs:
+        return sorted(cifs, key=lambda x: str(x))[0]
+    return sorted(paths, key=lambda x: str(x))[0]
+
+
+def _paths_at_max_af_version(
+    stem_to_paths: Dict[str, List[Path]], pattern: Pattern[str]
+) -> List[Path]:
+    """
+    Match stems with pattern groups: (fragment F, version V).
+    Pick the globally highest V, then return one path per matching stem at that V
+    (prefer .cif when a stem has multiple extensions).
+    """
+    rows: List[Tuple[int, int, str]] = []
+    for stem in stem_to_paths:
+        m = pattern.match(stem)
+        if m:
+            fragment = int(m.group(1))
+            version = int(m.group(2))
+            rows.append((version, fragment, stem))
+    if not rows:
+        return []
+    max_v = max(r[0] for r in rows)
+    stems_at_max = sorted({r[2] for r in rows if r[0] == max_v})
+    return [_pick_path_prefer_cif(stem_to_paths[s]) for s in stems_at_max]
+
+
+def resolve_id(requested_id: str, stem_to_paths: Dict[str, List[Path]]) -> List[Path]:
+    """
+    Resolve a requested protein id to file path(s) under input_path / extracted tree.
+
+    1) Exact stem match (prefer .cif over .pdb).
+    2) AF exact: AF-{id}-F{N}-model_v{V} — highest V, all fragments at that V.
+    3) AF loose (isoform): AF-{id}-{digits}-F{N}-model_v{V} — same version rule.
+    """
+    if requested_id in stem_to_paths:
+        return [_pick_path_prefer_cif(stem_to_paths[requested_id])]
+
+    af_exact = re.compile(rf"^AF-{re.escape(requested_id)}-F(\d+)-model_v(\d+)$")
+    found = _paths_at_max_af_version(stem_to_paths, af_exact)
+    if found:
+        return found
+
+    af_loose = re.compile(rf"^AF-{re.escape(requested_id)}-\d+-F(\d+)-model_v(\d+)$")
+    return _paths_at_max_af_version(stem_to_paths, af_loose)
+
+
 def save_extracted_files(
     structures_dataset: "StructuresDataset",
     extracted_path: Path,
@@ -79,52 +142,44 @@ def save_extracted_files(
     Path(structures_dataset.structures_path()).mkdir(exist_ok=True, parents=True)
     pdb_repo_path = structures_dataset.structures_path()
 
-    pdb_iterator = iglob(str(extracted_path) + "/**/*.pdb")
-    direct_pdb_iterator = iglob(str(extracted_path) + "/*.pdb")
-
-    pdb_files_name_to_dir = {
-        Path(file).name.replace(".pdb", "").replace(".cif", ""): file for file in pdb_iterator
+    extracted_path = Path(extracted_path)
+    stem_to_paths = build_stem_to_paths(extracted_path)
+    picked_by_stem = {
+        stem: _pick_path_prefer_cif(paths) for stem, paths in stem_to_paths.items()
     }
 
-    direct_pdb_files_name_to_dir = {
-        Path(file).name.replace(".pdb", "").replace(".cif", ""): file for file in direct_pdb_iterator
-    }
-
-    cif_iterator = iglob(str(extracted_path) + "/**/*.cif")
-    direct_cif_iterator = iglob(str(extracted_path) + "/*.cif")
-
-    cif_files_name_to_dir = {
-        Path(file).name.replace(".pdb", "").replace(".cif", ""): file for file in cif_iterator
-    }
-    direct_cif_files_name_to_dir = {
-        Path(file).name.replace(".pdb", "").replace(".cif", ""): file for file in direct_cif_iterator
-    }
-
-    files_name_to_dir = {**pdb_files_name_to_dir, **direct_pdb_files_name_to_dir, **cif_files_name_to_dir, **direct_cif_files_name_to_dir}
-
-    logger.debug(f"extracted files: {len(files_name_to_dir)}")
-
-    for name, path in files_name_to_dir.items():
-        files_name_to_dir[name] = path.removeprefix(str(structures_dataset.input_path) + '/')
-
-    present_files_set = set(files_name_to_dir.keys())
-
+    logger.debug(f"extracted files: {len(stem_to_paths)} unique stems")
 
     if ids is None:
-        files = list(files_name_to_dir.values())
+        files = [str(picked_by_stem[s]) for s in sorted(picked_by_stem)]
         chunks = list(structures_dataset.chunk(files))
         missing_files = None
     else:
-        logger.info(f"Searching for {len(ids)} files in {len(present_files_set)} already extracted files")
+        logger.info(
+            f"Searching for {len(ids)} ids among {len(stem_to_paths)} stems under {extracted_path}"
+        )
 
-        ids_set = set(ids)
+        wanted_paths: List[str] = []
+        seen_resolved: set[str] = set()
+        missing_files = []
 
-        wanted_files = present_files_set & ids_set
-        wanted_files = [f"{structures_dataset.input_path}/{files_name_to_dir[file]}" for file in wanted_files]
-        missing_files = list(ids_set - present_files_set)
+        for raw_id in ids:
+            rid = raw_id.strip()
+            resolved_paths = resolve_id(rid, stem_to_paths)
+            if not resolved_paths:
+                missing_files.append(raw_id)
+                continue
+            for p in resolved_paths:
+                key = str(p.resolve())
+                if key not in seen_resolved:
+                    seen_resolved.add(key)
+                    wanted_paths.append(str(p))
 
-        logger.info(f"Found {len(wanted_files)}, missing {len(missing_files)} out of {len(ids)} requested files")
-        ids = wanted_files
+        logger.info(
+            f"Resolved {len(wanted_paths)} file path(s), {len(missing_files)} missing "
+            f"out of {len(ids)} requested ids"
+        )
+        ids = wanted_paths
 
         chunks = list(structures_dataset.chunk(ids))
 
@@ -164,24 +219,12 @@ def save_extracted_files(
 
     input_structures_index = {}
 
-    for file_path_str in files_name_to_dir.values():
-        file_path = Path(file_path_str)
-        file_name_without_extension = file_path.stem
-
-        id_with_chain = no_chain_to_chain_dict.get(file_name_without_extension, None)
-
-        if id_with_chain:
-            input_structures_index[id_with_chain] = file_path.name
-        # else this protein is missing from the archive
-        
-
-    # for cif_file_name in cif_files_name_to_dir.keys():
-    #     match = re.match(r'^AF-(.+?)-F1-model_v\d+$', cif_file_name)
-    #     if match:
-    #         pdb_id = match.group(1)
-    #         chain_id = list(file_to_pdb(retrieve_single_file(cif_files_name_to_dir[cif_file_name])).keys())[0].split('_')[-1]
-    #         files_name_to_dir[pdb_id + "_" + chain_id] = files_name_to_dir[cif_file_name]
-    #         del files_name_to_dir[cif_file_name]
+    for stem, picked in sorted(picked_by_stem.items(), key=lambda x: x[0]):
+        file_path = picked
+        id_with_chain = no_chain_to_chain_dict.get(stem, None)
+        if id_with_chain is None:
+            continue
+        input_structures_index[id_with_chain] = file_path.name
 
     try:
         add_new_files_to_index(structures_dataset.dataset_index_file_path(), new_files_index, structures_dataset.config.data_path)
