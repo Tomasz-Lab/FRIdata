@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Iterable, List, Optional, Tuple, Dict, Pattern
+from typing import Iterable, List, Optional, Tuple, Dict, Pattern, Union
 import zipfile
 import tarfile
 from pathlib import Path
@@ -128,6 +128,29 @@ def resolve_id(requested_id: str, stem_to_paths: Dict[str, List[Path]]) -> List[
     return _paths_at_max_af_version(stem_to_paths, af_loose)
 
 
+_AF_FRAGMENT_NUM_RE = re.compile(r"-F(\d+)-model_v\d+$")
+
+
+def pick_single_path_for_canonical_id(paths: List[Path]) -> Path:
+    """
+    When multiple structures match one ids_file id (e.g. F1 and F2 at same model version),
+    keep a single file: lowest AF fragment number F{N}; ties by resolved path string.
+    Non-AF stems sort after AF (fragment key 10**9).
+    """
+    if not paths:
+        raise ValueError("paths must be non-empty")
+    if len(paths) == 1:
+        return paths[0]
+    scored: List[Tuple[int, str, Path]] = []
+    for p in paths:
+        stem = p.stem
+        m = _AF_FRAGMENT_NUM_RE.search(stem)
+        frag = int(m.group(1)) if m else 10**9
+        scored.append((frag, str(p.resolve()), p))
+    scored.sort(key=lambda t: (t[0], t[1]))
+    return scored[0][2]
+
+
 def save_extracted_files(
     structures_dataset: "StructuresDataset",
     extracted_path: Path,
@@ -150,6 +173,9 @@ def save_extracted_files(
 
     logger.debug(f"extracted files: {len(stem_to_paths)} unique stems")
 
+    canonical_base_to_source_name: Dict[str, str] = {}
+    use_canonical_ids = ids is not None
+
     if ids is None:
         files = [str(picked_by_stem[s]) for s in sorted(picked_by_stem)]
         chunks = list(structures_dataset.chunk(files))
@@ -159,7 +185,7 @@ def save_extracted_files(
             f"Searching for {len(ids)} ids among {len(stem_to_paths)} stems under {extracted_path}"
         )
 
-        wanted_paths: List[str] = []
+        wanted_items: List[Union[str, Tuple[str, str]]] = []
         seen_resolved: set[str] = set()
         missing_files = []
 
@@ -169,19 +195,18 @@ def save_extracted_files(
             if not resolved_paths:
                 missing_files.append(raw_id)
                 continue
-            for p in resolved_paths:
-                key = str(p.resolve())
-                if key not in seen_resolved:
-                    seen_resolved.add(key)
-                    wanted_paths.append(str(p))
+            chosen = pick_single_path_for_canonical_id(resolved_paths)
+            key = str(chosen.resolve())
+            if key not in seen_resolved:
+                seen_resolved.add(key)
+                wanted_items.append((key, rid))
+                canonical_base_to_source_name[rid] = chosen.name
 
         logger.info(
-            f"Resolved {len(wanted_paths)} file path(s), {len(missing_files)} missing "
+            f"Resolved {len(wanted_items)} file path(s), {len(missing_files)} missing "
             f"out of {len(ids)} requested ids"
         )
-        ids = wanted_paths
-
-        chunks = list(structures_dataset.chunk(ids))
+        chunks = list(structures_dataset.chunk(wanted_items))
 
     mkdir_for_batches(pdb_repo_path, len(chunks))
 
@@ -219,12 +244,19 @@ def save_extracted_files(
 
     input_structures_index = {}
 
-    for stem, picked in sorted(picked_by_stem.items(), key=lambda x: x[0]):
-        file_path = picked
-        id_with_chain = no_chain_to_chain_dict.get(stem, None)
-        if id_with_chain is None:
-            continue
-        input_structures_index[id_with_chain] = file_path.name
+    if use_canonical_ids:
+        for id_with_chain in sorted(new_files_index.keys()):
+            base = id_with_chain.rsplit("_", 1)[0]
+            src = canonical_base_to_source_name.get(base)
+            if src is not None:
+                input_structures_index[id_with_chain] = src
+    else:
+        for stem, picked in sorted(picked_by_stem.items(), key=lambda x: x[0]):
+            file_path = picked
+            id_with_chain = no_chain_to_chain_dict.get(stem, None)
+            if id_with_chain is None:
+                continue
+            input_structures_index[id_with_chain] = file_path.name
 
     try:
         add_new_files_to_index(structures_dataset.dataset_index_file_path(), new_files_index, structures_dataset.config.data_path)
@@ -236,7 +268,9 @@ def save_extracted_files(
 
 
 def retrieve_protein_file_to_h5(
-    path_for_batch: Path, pdb_ids: Iterable[str], workers: List[str] = None
+    path_for_batch: Path,
+    pdb_ids: Iterable[Union[str, Tuple[str, str]]],
+    workers: List[str] = None,
 ) -> Tuple[List[str], str]:
     with worker_client() as client:
         start_time = time.time()
@@ -273,12 +307,26 @@ def retrieve_protein_file_to_h5(
         return pdb_ids, h5_file_path
 
 
-def retrieve_single_file(file_path):
-    file_path = Path(file_path)
-    file_name = file_path.stem
+def retrieve_single_file(
+    item: Union[str, Tuple[str, str], List[str]],
+):
+    """
+    Load structure file for conversion.
+
+    ``item`` is either a path string, or ``(path_str, canonical_pdb_code)`` where
+    ``canonical_pdb_code`` is the ids_file token used as ``cif_to_pdb`` / PDB key base
+    (e.g. UniProt accession), not the AF CIF filename stem.
+    """
+    canonical: Optional[str] = None
+    if isinstance(item, (tuple, list)) and len(item) == 2:
+        file_path = Path(item[0])
+        canonical = str(item[1])
+    else:
+        file_path = Path(item)
+    pdb_code = canonical if canonical is not None else file_path.stem
     file_extension = file_path.suffix
     with open(file_path, "r") as file:
-        return file.read(), file_name, file_extension
+        return file.read(), pdb_code, file_extension
 
 
 def file_to_pdb(input_data):

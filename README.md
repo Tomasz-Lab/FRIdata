@@ -86,6 +86,8 @@ PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/fridata.py \
  -e ${EMBEDDER_TYPE}
 ```
 
+For subset runs with `--input-path`, new datasets store canonical keys as `{line_from_ids_file}_{chain}` (for example `A0A2K6V5L6_A`), not the full AlphaFold CIF filename stem. The dataset’s `input_structures.idx` maps each canonical key to the source structure filename. Older datasets created before this convention may still use long AF-style keys.
+
 ## Running as a CLI tool
 
 Assuming all `Instalation and activation` steps succeeded.
@@ -106,7 +108,7 @@ python3 -m pip install -e .
 
 ```
 $ fridata <...>
-```
+```3dc54 (Use ids_file tokens (e.g. plain UniProt) plus chain as the canonical dataset index keys)
 
 ## Running on HPC
 
