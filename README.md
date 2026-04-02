@@ -86,6 +86,28 @@ PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/fridata.py \
  -e ${EMBEDDER_TYPE}
 ```
 
+## Running as a CLI tool
+
+Assuming all `Instalation and activation` steps succeeded.
+
+0. Go into `FRIdata` directory
+
+```
+cd <path into FRIdata>
+```
+
+1. Install as a CLI tool
+
+```
+python3 -m pip install -e .
+```
+
+2. Now FRIdata can be run as a CLI tool
+
+```
+$ fridata <...>
+```
+
 ## Running on HPC
 
 Running FRIdata on HPC differs on CPU and GPU nodes. This instruction set is valid for HPC hosted in PLGrid infrastructure. Running on other infrastructures may require additional adjustments.
