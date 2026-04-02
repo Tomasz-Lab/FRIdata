@@ -1,4 +1,3 @@
-import datetime
 import hashlib
 import zipfile
 from pathlib import Path
@@ -59,22 +58,10 @@ def create_archive(structures_dataset: "StructuresDataset"):
         futures.append(future)
 
     n = len(futures)
-    logger.info("Building combined PDB archive from %s H5 shard(s)", n)
+    logger.info("Writing %s PDB shard zip(s) under %s", n, output_dir)
 
-    current_time = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-    final_archive_name = (
-        f"archive_pdb_{structures_dataset.dataset_dir_name()}_{current_time}.zip"
-    )
-    final_archive_path = output_dir / final_archive_name
-
-    with zipfile.ZipFile(final_archive_path, "w") as final_zip:
-        with logging_redirect_tqdm():
-            with tqdm(total=n, desc="H5 shards → final zip", unit="h5") as pbar:
-                i = 0
-                for fut in as_completed(futures):
-                    archive_path = fut.result()
-                    with open(archive_path, "rb") as f:
-                        archive_data = f.read()
-                    final_zip.writestr(f"{i}.zip", archive_data)
-                    i += 1
-                    pbar.update(1)
+    with logging_redirect_tqdm():
+        with tqdm(total=n, desc="H5 shards → zip", unit="h5") as pbar:
+            for fut in as_completed(futures):
+                fut.result()
+                pbar.update(1)
