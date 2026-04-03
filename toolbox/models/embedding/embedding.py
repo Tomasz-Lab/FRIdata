@@ -75,7 +75,7 @@ class Embedding:
         create_index(self.embeddings_index_path, present_embeddings, self.structures_dataset.config.data_path)
 
         end = time.time()
-        logger.info(f"Total time: {format_time(end - start)}")
+        logger.info(f"Total time: {format_time(end - start)}\n")
 
 
     def missing_ids_to_fasta(self, missing_ids: List[str]) -> Dict[str, str]:
