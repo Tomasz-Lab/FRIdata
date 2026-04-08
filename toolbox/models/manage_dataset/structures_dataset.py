@@ -145,7 +145,9 @@ class StructuresDataset(BaseModel):
     
     def input_structures_index_path(self):
         return self.dataset_path() / "input_structures.idx"
-        
+
+    def downloaded_structures_index_path(self) -> Path:
+        return self.dataset_path() / "downloaded_structures.idx"
 
     def batches_count(self) -> int:
         """Count the number of batch directories (numeric directories only)."""
@@ -351,6 +353,16 @@ class StructuresDataset(BaseModel):
     def add_new_files_to_index(self, new_files_index):
         add_new_files_to_index(self.dataset_index_file_path(), new_files_index, self.config.data_path)
 
+    def add_downloaded_structures_to_index(self, new_files_index: dict) -> None:
+        """Merge Biotite download tracking (entry id -> pdbs.h5 path) into downloaded_structures.idx."""
+        if not new_files_index:
+            return
+        add_new_files_to_index(
+            self.downloaded_structures_index_path(),
+            new_files_index,
+            self.config.data_path,
+        )
+
     def _download_pdb_(self, ids: List[str]):
         Path(self.structures_path()).mkdir(exist_ok=True, parents=True)
         pdb_repo_path = self.structures_path()
@@ -365,6 +377,7 @@ class StructuresDataset(BaseModel):
         logger.info(f"Downloading {len(ids)} PDBs into {len(chunks)} new chunks (offset by {batch_offset})")
 
         new_files_index = {}
+        downloaded_structures_index: dict = {}
 
         def run(input_data, machine):
             return self._client.submit(
@@ -376,9 +389,10 @@ class StructuresDataset(BaseModel):
             )
 
         def collect(result):
-            downloaded_pdbs, file_path = result
+            downloaded_pdbs, file_path, dl_map = result
             logger.debug(f"Updating new_files_index with {len(downloaded_pdbs)} files")
             new_files_index.update({k: file_path for k in downloaded_pdbs})
+            downloaded_structures_index.update(dl_map)
 
         compute_batches = ComputeBatches(
             self._client,
@@ -402,6 +416,7 @@ class StructuresDataset(BaseModel):
         try:
             logger.info(f"Extracted {len(new_files_index)} new protein chain(s)")
             self.add_new_files_to_index(new_files_index)
+            self.add_downloaded_structures_to_index(downloaded_structures_index)
         except Exception as e:
             logger.error(f"Failed to update index: {e}")
 
@@ -422,30 +437,34 @@ class StructuresDataset(BaseModel):
         logger.info(f"Downloading {len(ids)} AFDB structures into {len(chunks)} new chunks (offset by {batch_offset})")
 
         new_files_index = {}
-        
+        downloaded_structures_index: dict = {}
+
         # Process each chunk with concurrent downloads
         for chunk_idx, ids_chunk in enumerate(chunks):
             batch_path = afdb_repo_path / f"{chunk_idx + batch_offset}"
-            
+
             # Use ThreadPoolExecutor for concurrent downloads within this chunk
-            downloaded_ids, file_path, _missing_files = retrieve_afdb_chunk_to_h5_concurrent(
-                batch_path,
-                ids_chunk,
-                max_workers=(os.cpu_count() or 8),
+            downloaded_ids, file_path, _missing_files, dl_map = (
+                retrieve_afdb_chunk_to_h5_concurrent(
+                    batch_path,
+                    ids_chunk,
+                    max_workers=(os.cpu_count() or 8),
+                )
             )
 
             missing_files.extend(_missing_files)
-            
+
             if downloaded_ids and file_path:
                 logger.debug(f"Updating new_files_index with {len(downloaded_ids)} files from chunk {chunk_idx}")
                 new_files_index.update({k: file_path for k in downloaded_ids})
-            
+            downloaded_structures_index.update(dl_map)
 
         logger.info("Adding new files to index")
 
         try:
             logger.info(f"Extracted {len(new_files_index)} new protein chain(s)")
             self.add_new_files_to_index(new_files_index)
+            self.add_downloaded_structures_to_index(downloaded_structures_index)
         except Exception as e:
             logger.error(f"Failed to update index: {e}")
 

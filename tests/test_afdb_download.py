@@ -1,24 +1,21 @@
 import os
 import shutil
-import json
 import pytest
 import time
 from pathlib import Path
-from unittest.mock import patch
 from dask.distributed import Client, LocalCluster
 import logging
 import warnings
 import distributed
 import tempfile
 
-from tests.utils import compare_dicts, FileComparator
-from tests.paths import OUTPATH, EXPPATH
+from tests.paths import OUTPATH
 from toolbox.config import Config
 from toolbox.models.manage_dataset.structures_dataset import StructuresDataset
 from toolbox.models.manage_dataset.collection_type import CollectionType
 from toolbox.models.manage_dataset.database_type import DatabaseType
 from toolbox.models.manage_dataset.index.handle_index import read_index
-from toolbox.models.manage_dataset.utils import read_pdbs_from_h5
+from toolbox.models.manage_dataset.utils import canonical_afdb_uniprot_id
 
 # give 666 permissions to new files
 os.umask(0o002)
@@ -169,12 +166,10 @@ def test_afdb_download_full_format():
         
         # Check that at least one entry exists for each UniProt ID
         # Index keys will be in format like "A0A009IHW8_A" (with chain suffix)
-        found_ids = set()
-        for key in index.keys():
-            # Extract base UniProt ID (before first underscore)
-            base_id = key.split('_')[0]
-            found_ids.add(base_id)
-        
+        found_ids = {
+            canonical_afdb_uniprot_id(key.split("_", 1)[0]) for key in index.keys()
+        }
+
         for uniprot_id in expected_uniprot_ids:
             assert uniprot_id in found_ids, f"UniProt ID {uniprot_id} not found in dataset index"
         
@@ -182,6 +177,16 @@ def test_afdb_download_full_format():
         structures_path = dataset.structures_path()
         h5_files = list(structures_path.glob("**/*.h5"))
         assert len(h5_files) > 0, "No HDF5 files found in structures directory"
+
+        dl_idx_path = dataset.downloaded_structures_index_path()
+        assert dl_idx_path.exists(), f"downloaded_structures.idx missing: {dl_idx_path}"
+        dl_index = read_index(dl_idx_path, config.data_path)
+        assert len(dl_index) > 0, "downloaded_structures.idx is empty"
+        for uniprot_id in expected_uniprot_ids:
+            assert uniprot_id in dl_index, f"UniProt {uniprot_id} not in downloaded_structures.idx"
+            h5_path = Path(dl_index[uniprot_id])
+            assert h5_path.is_file(), f"pdbs.h5 path missing for {uniprot_id}: {h5_path}"
+            assert h5_path.name == "pdbs.h5", f"expected pdbs.h5, got {h5_path.name}"
         
         print(f"=== Completed AFDB download test (full format) ===\n")
         
@@ -241,11 +246,10 @@ def test_afdb_download_stripped_format():
         # Verify that all expected UniProt IDs are present
         expected_uniprot_ids = ["A0A009IHW8", "A0A023FDY8", "A0A023FFD0", "A0A023I7E1"]
         
-        found_ids = set()
-        for key in index.keys():
-            base_id = key.split('_')[0]
-            found_ids.add(base_id)
-        
+        found_ids = {
+            canonical_afdb_uniprot_id(key.split("_", 1)[0]) for key in index.keys()
+        }
+
         for uniprot_id in expected_uniprot_ids:
             assert uniprot_id in found_ids, f"UniProt ID {uniprot_id} not found in dataset index"
         
@@ -253,6 +257,12 @@ def test_afdb_download_stripped_format():
         structures_path = dataset.structures_path()
         h5_files = list(structures_path.glob("**/*.h5"))
         assert len(h5_files) > 0, "No HDF5 files found in structures directory"
+
+        dl_idx_path = dataset.downloaded_structures_index_path()
+        assert dl_idx_path.exists(), f"downloaded_structures.idx missing: {dl_idx_path}"
+        dl_index = read_index(dl_idx_path, config.data_path)
+        for uniprot_id in expected_uniprot_ids:
+            assert uniprot_id in dl_index, f"UniProt {uniprot_id} not in downloaded_structures.idx"
         
         print(f"=== Completed AFDB download test (stripped format) ===\n")
         
@@ -313,11 +323,10 @@ def test_afdb_download_mixed_format():
         # Regardless of input format, all should be processed correctly
         expected_uniprot_ids = ["A0A009IHW8", "A0A023FDY8", "A0A023FFD0", "A0A023I7E1"]
         
-        found_ids = set()
-        for key in index.keys():
-            base_id = key.split('_')[0]
-            found_ids.add(base_id)
-        
+        found_ids = {
+            canonical_afdb_uniprot_id(key.split("_", 1)[0]) for key in index.keys()
+        }
+
         for uniprot_id in expected_uniprot_ids:
             assert uniprot_id in found_ids, f"UniProt ID {uniprot_id} not found in dataset index"
         
@@ -325,6 +334,12 @@ def test_afdb_download_mixed_format():
         structures_path = dataset.structures_path()
         h5_files = list(structures_path.glob("**/*.h5"))
         assert len(h5_files) > 0, "No HDF5 files found in structures directory"
+
+        dl_idx_path = dataset.downloaded_structures_index_path()
+        assert dl_idx_path.exists(), f"downloaded_structures.idx missing: {dl_idx_path}"
+        dl_index = read_index(dl_idx_path, config.data_path)
+        for uniprot_id in expected_uniprot_ids:
+            assert uniprot_id in dl_index, f"UniProt {uniprot_id} not in downloaded_structures.idx"
         
         print(f"=== Completed AFDB download test (mixed format) ===\n")
         
@@ -376,8 +391,12 @@ def test_afdb_id_conversion():
         index_stripped = read_index(dataset_stripped.dataset_index_file_path(), config.data_path)
         
         # Extract base UniProt IDs from both indices
-        ids_full = {key.split('_')[0] for key in index_full.keys()}
-        ids_stripped = {key.split('_')[0] for key in index_stripped.keys()}
+        ids_full = {
+            canonical_afdb_uniprot_id(key.split("_", 1)[0]) for key in index_full.keys()
+        }
+        ids_stripped = {
+            canonical_afdb_uniprot_id(key.split("_", 1)[0]) for key in index_stripped.keys()
+        }
         
         # Both should result in the same set of UniProt IDs
         assert ids_full == ids_stripped, \

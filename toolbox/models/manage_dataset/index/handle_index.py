@@ -23,6 +23,8 @@ def read_index(index_file_path: Path, data_path: str) -> Dict[str, str]:
                 "(e.g. -t dataset,sequences,...) or run create_dataset first so the structure index is created.",
                 resolved,
             )
+        elif index_file_path.name == "downloaded_structures.idx":
+            logger.debug("Index file not found (will create): %s", resolved)
         else:
             logger.error("Index file not found: %s", resolved)
         return {}
@@ -52,4 +54,4 @@ def add_new_files_to_index(dataset_index_file_path: Path, new_files_index: Dict,
         current_index.update(new_files_index)
         create_index(dataset_index_file_path, current_index, data_path)
     except Exception:
-        logger.exception("add_new_files_to_index failed for %s with error: %s", dataset_index_file_path, e)
+        logger.exception("add_new_files_to_index failed for %s", dataset_index_file_path)

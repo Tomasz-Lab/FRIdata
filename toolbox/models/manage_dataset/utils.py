@@ -205,12 +205,47 @@ def compress_and_save_h5(
     return str(pdbs_file)
 
 
+def downloaded_structures_map_rcsb(
+    aggregated: Tuple[List[str], List[str], list],
+    h5_file_path: Optional[str],
+) -> Dict[str, str]:
+    """PDB entry id -> pdbs.h5 path for entries where biotite rcsb.fetch returned data."""
+    if not h5_file_path:
+        return {}
+    out: Dict[str, str] = {}
+    for item in aggregated[2]:
+        pdb_id, payload = item
+        if payload is not None:
+            out[pdb_id] = h5_file_path
+    return out
+
+
+def canonical_afdb_uniprot_id(uniprot_id: str) -> str:
+    """Normalize AFDB ids (e.g. AF-ACCESSION-F1-model_v4 or ACCESSION) to UniProt accession."""
+    s = uniprot_id.strip()
+    if s.startswith("AF-"):
+        s = s.removeprefix("AF-")
+    # EBI filenames may use v4, v6, etc.; chain keys sometimes end with -F1-model only
+    s = re.sub(r"-F1-model(_v\d+)?$", "", s)
+    return s
+
+
+def downloaded_structures_map_afdb_fetched(
+    successful_downloads: List[str],
+    h5_file_path: Optional[str],
+) -> Dict[str, str]:
+    """UniProt id -> pdbs.h5 path for IDs where biotite afdb.fetch succeeded (requires H5 path)."""
+    if not h5_file_path:
+        return {}
+    return {canonical_afdb_uniprot_id(uid): h5_file_path for uid in successful_downloads}
+
+
 def retrieve_pdb_chunk_to_h5(
     path_for_batch: Path,
     pdb_ids: Iterable[str],
     is_binary: bool,
     workers: List[str] = None,
-) -> Tuple[List[str], str]:
+) -> Tuple[List[str], str, Dict[str, str]]:
     with worker_client() as client:
         # start_time = time.time()
 
@@ -241,17 +276,25 @@ def retrieve_pdb_chunk_to_h5(
         get_ids_task = client.submit(
             lambda results: results[0], aggregated, workers=workers
         )
+        downloaded_map_task = client.submit(
+            downloaded_structures_map_rcsb,
+            aggregated,
+            h5_task,
+            workers=workers,
+        )
         # zip_task = client.submit(create_cif_files_zip_archive, path_for_batch, aggregated, pure=False)
         # pdb_zip_task = client.submit(create_pdb_zip_archive, path_for_batch, aggregated, pure=False)
 
         # Compute the tasks
-        pdb_ids, h5_file_path = client.gather([get_ids_task, h5_task])
+        pdb_ids, h5_file_path, downloaded_map = client.gather(
+            [get_ids_task, h5_task, downloaded_map_task]
+        )
 
         # end_time = time.time()
         # total_time = end_time - start_time
         # logger.info(f"Total processing time {path_for_batch.stem}: {format_time(total_time)}")
 
-        return pdb_ids, h5_file_path
+        return pdb_ids, h5_file_path or "", downloaded_map or {}
 
 
 def fetch_one_afdb(
@@ -305,7 +348,7 @@ def retrieve_afdb_chunk_to_h5_concurrent(
     path_for_batch: Path,
     uniprot_ids: Iterable[str],
     max_workers: int = 8,
-) -> Tuple[List[str], str, List[str]]:
+) -> Tuple[List[str], str, List[str], Dict[str, str]]:
     """
     Download AFDB structures for a chunk of UniProt IDs concurrently using ThreadPoolExecutor,
     convert to PDB format, and save to HDF5 file.
@@ -320,10 +363,11 @@ def retrieve_afdb_chunk_to_h5_concurrent(
           - list of successfully processed chain IDs (what gets written to HDF5)
           - path to the HDF5 file (empty string on failure)
           - list of missing UniProt IDs from the input chunk (retry candidates)
+          - map of UniProt id -> pdbs.h5 path for successful biotite downloads (empty if no H5)
     """
     chunk_ids = list(uniprot_ids)
     if not chunk_ids:
-        return [], "", []
+        return [], "", [], {}
     
     temp_dir = None
     try:
@@ -354,7 +398,7 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         
         if not successful_downloads:
             logger.warning(f"No AFDB structures were successfully downloaded for chunk (all {len(chunk_ids)} IDs failed)")
-            return [], "", chunk_ids
+            return [], "", chunk_ids, {}
         
         if failed_downloads:
             logger.warning(f"Failed to download {len(failed_downloads)} out of {len(chunk_ids)} IDs")
@@ -371,7 +415,7 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         
         if not cif_files:
             logger.warning(f"No CIF files found in temp directory after download")
-            return [], "", chunk_ids
+            return [], "", chunk_ids, {}
 
         chunk_ids_set = set(chunk_ids)
         
@@ -411,16 +455,21 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         # Save to HDF5
         if len(all_res_pdbs) == 0 or len(all_contents) == 0:
             logger.warning("No PDB structures to save")
-            return [], "", chunk_ids
+            return [], "", chunk_ids, {}
         
         results = (all_res_pdbs, all_contents, [])
         h5_file_path = compress_and_save_h5(path_for_batch, results)
         
         if h5_file_path is None:
-            return [], "", chunk_ids
+            return [], "", chunk_ids, {}
         
         missing_ids = [uniprot_id for uniprot_id in chunk_ids if uniprot_id not in succeeded_uniprot_ids]
-        return all_res_pdbs, h5_file_path, missing_ids
+        return (
+            all_res_pdbs,
+            h5_file_path,
+            missing_ids,
+            downloaded_structures_map_afdb_fetched(successful_downloads, h5_file_path),
+        )
         
     finally:
         # Cleanup temporary directory
@@ -435,7 +484,7 @@ def retrieve_afdb_chunk_to_h5(
     path_for_batch: Path,
     uniprot_ids: Iterable[str],
     workers: List[str] = None,
-) -> Tuple[List[str], str]:
+) -> Tuple[List[str], str, Dict[str, str]]:
     """
     Download AFDB structures for a chunk of UniProt IDs, convert to PDB format,
     and save to HDF5 file.
@@ -446,11 +495,11 @@ def retrieve_afdb_chunk_to_h5(
         workers: Optional list of worker names for dask
     
     Returns:
-        Tuple of (list of successfully processed IDs, path to HDF5 file)
+        Tuple of (chain IDs, path to HDF5 file, downloaded_structures map for biotite fetches)
     """
     chunk_ids = list(uniprot_ids)
     if not chunk_ids:
-        return [], ""
+        return [], "", {}
     
     temp_dir = None
     try:
@@ -475,7 +524,7 @@ def retrieve_afdb_chunk_to_h5(
         
         if not successful_downloads:
             logger.warning(f"No AFDB structures were successfully downloaded for chunk (all {len(chunk_ids)} IDs failed)")
-            return [], ""
+            return [], "", {}
         
         if failed_downloads:
             logger.warning(f"Failed to download {len(failed_downloads)} out of {len(chunk_ids)} IDs: {failed_downloads}")
@@ -491,7 +540,7 @@ def retrieve_afdb_chunk_to_h5(
         
         if not cif_files:
             logger.warning(f"No CIF files found in temp directory after download")
-            return [], ""
+            return [], "", {}
         
         # Process each CIF file
         for cif_file in cif_files:
@@ -525,15 +574,19 @@ def retrieve_afdb_chunk_to_h5(
         # Save to HDF5
         if len(all_res_pdbs) == 0 or len(all_contents) == 0:
             logger.warning("No PDB structures to save")
-            return [], ""
+            return [], "", {}
         
         results = (all_res_pdbs, all_contents, [])
         h5_file_path = compress_and_save_h5(path_for_batch, results)
         
         if h5_file_path is None:
-            return [], ""
+            return [], "", {}
         
-        return all_res_pdbs, h5_file_path
+        return (
+            all_res_pdbs,
+            h5_file_path,
+            downloaded_structures_map_afdb_fetched(successful_downloads, h5_file_path),
+        )
         
     finally:
         # Cleanup temporary directory
