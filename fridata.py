@@ -225,7 +225,8 @@ def create_parser():
     add_common_arguments(verify_chains_parser)
 
     create_archive_parser = subparsers.add_parser(
-        "create_archive", help="Create PDB compressed archive"
+        "create_archive",
+        help="Write one PDB .zip per H5 shard under data_path/archives/<dataset>/",
     )
     add_common_arguments(create_archive_parser)
 
