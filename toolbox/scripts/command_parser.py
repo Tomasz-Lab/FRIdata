@@ -241,7 +241,7 @@ class CommandParser:
         if is_error:
             logger.info("Error! Exiting...")
         else:
-            logger.info("\nComputation successfully completed!")
+            logger.info("Computation successfully completed!")
 
     def generate_data(self):
         from toolbox.models.manage_dataset.structures_dataset import FatalDatasetError
