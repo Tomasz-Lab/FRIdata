@@ -239,7 +239,7 @@ class CommandParser:
 
         logger.info(f"Total time for all steps: {format_time(time.time() - started_at)}")
         if is_error:
-            logger.info("Error! Exiting...")
+            logger.error("Error! Exiting...")
         else:
             logger.info("Computation successfully completed!")
 
