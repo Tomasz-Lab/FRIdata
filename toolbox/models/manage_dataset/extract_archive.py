@@ -170,7 +170,9 @@ def save_extracted_files(
 
         id_with_chain = no_chain_to_chain_dict.get(file_name_without_extension, None)
 
-        input_structures_index[id_with_chain] = file_path.name
+        if id_with_chain:
+            input_structures_index[id_with_chain] = file_path.name
+        # else this protein is missing from the archive
         
 
     # for cif_file_name in cif_files_name_to_dir.keys():
