@@ -28,3 +28,8 @@ dask-scratch-space
 
 *.egg-info
 build
+
+# AU
+.claude/skills/gitnexus/*
+
+.gitnexus
