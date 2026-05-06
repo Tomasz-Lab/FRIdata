@@ -1,8 +1,11 @@
 from pathlib import Path
 
+import pytest
+
 from tests.paths import EXPPATH
 
 from toolbox.viewer.export_index_html import (
+    discover_dataset,
     extract_dataset_identity_from_path,
     extract_batch_id_from_path,
     stream_parse_idx,
@@ -10,6 +13,29 @@ from toolbox.viewer.export_index_html import (
     compute_global_rollup,
     find_index_files,
 )
+
+
+def test_discover_dataset_single_ref():
+    root = EXPPATH / "datasets"
+    ds_dir = root / "PDB-subset--fifth_7"
+
+    by_path = discover_dataset(str(ds_dir), root)
+    assert by_path.path == ds_dir.resolve()
+    assert by_path.identity.slug == "fifth_7"
+
+    by_slug = discover_dataset("fifth_7", root)
+    assert by_slug.path.resolve() == ds_dir.resolve()
+
+    by_folder_name = discover_dataset("PDB-subset--fifth_7", root)
+    assert by_folder_name.path.resolve() == ds_dir.resolve()
+
+    by_json = discover_dataset(str(ds_dir / "dataset.json"), root)
+    assert by_json.path.resolve() == ds_dir.resolve()
+
+    with pytest.raises(ValueError):
+        discover_dataset(None, root)
+    with pytest.raises(FileNotFoundError):
+        discover_dataset("__nonexistent_dataset_slug__", root)
 
 
 def test_identity_and_batch_parsing():

@@ -226,8 +226,7 @@ class CommandParser:
 
         out_path = export_index_view(
             config=self.config,
-            dataset=getattr(self.args, "dataset", None),
-            dataset_slug=getattr(self.args, "dataset_slug", None),
+            dataset_ref=getattr(self.args, "dataset", None),
             root=getattr(self.args, "root", None),
             index_types=index_types,
             output_dir=getattr(self.args, "output_dir", None),

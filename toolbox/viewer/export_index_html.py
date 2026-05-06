@@ -64,19 +64,27 @@ def _parse_identity_from_folder_name(name: str) -> Optional[DatasetIdentity]:
 
 
 def discover_dataset(
-    dataset_arg: Optional[Path],
+    dataset_ref: Optional[str | Path],
     datasets_root: Path,
-    dataset_slug: Optional[str],
 ) -> DatasetMeta:
-    # Case 1: dataset path provided (dir or dataset.json)
-    if dataset_arg:
-        dataset_arg = Path(dataset_arg).resolve()
-        if dataset_arg.is_file() and dataset_arg.name == "dataset.json":
-            dataset_dir = dataset_arg.parent
-        elif dataset_arg.is_dir():
-            dataset_dir = dataset_arg
+    """Resolve a dataset from a single reference string or path.
+
+    If ``dataset_ref`` is an existing filesystem path (directory or
+    ``dataset.json`` file), treat it as the dataset location. Otherwise treat it
+    as a slug under ``datasets_root`` (or a full folder name under that root).
+    """
+    if dataset_ref is None or (isinstance(dataset_ref, str) and not dataset_ref.strip()):
+        raise ValueError("Dataset reference is required (path, slug, or folder name under --root)")
+
+    path_candidate = Path(dataset_ref).expanduser()
+    if path_candidate.exists():
+        resolved = path_candidate.resolve()
+        if resolved.is_file() and resolved.name == "dataset.json":
+            dataset_dir = resolved.parent
+        elif resolved.is_dir():
+            dataset_dir = resolved
         else:
-            raise FileNotFoundError(f"Invalid dataset reference: {dataset_arg}")
+            raise FileNotFoundError(f"Invalid dataset reference: {resolved}")
 
         identity = _parse_identity_from_folder_name(dataset_dir.name)
         if identity is None:
@@ -85,26 +93,27 @@ def discover_dataset(
             )
         return DatasetMeta(identity=identity, path=dataset_dir)
 
-    # Case 2: discover by slug under datasets root
-    if dataset_slug:
-        matches = [d for d in (datasets_root.glob("*/")) if d.is_dir() and d.name.endswith(f"--{dataset_slug}")]
-        # Prefer exact enum prefix match if multiple
-        for d in matches:
-            identity = _parse_identity_from_folder_name(d.name)
-            if identity:
-                return DatasetMeta(identity=identity, path=d)
+    dataset_slug = str(dataset_ref).strip()
+    matches = [
+        d
+        for d in datasets_root.glob("*/")
+        if d.is_dir() and d.name.endswith(f"--{dataset_slug}")
+    ]
+    for d in matches:
+        identity = _parse_identity_from_folder_name(d.name)
+        if identity:
+            return DatasetMeta(identity=identity, path=d)
 
-        # Fallback: user may have passed the full folder name instead of just the slug
-        exact = datasets_root / dataset_slug
-        if exact.is_dir():
-            identity = _parse_identity_from_folder_name(exact.name)
-            if identity:
-                return DatasetMeta(identity=identity, path=exact)
+    # Fallback: full folder name under datasets_root
+    exact = datasets_root / dataset_slug
+    if exact.is_dir():
+        identity = _parse_identity_from_folder_name(exact.name)
+        if identity:
+            return DatasetMeta(identity=identity, path=exact)
 
-        raise FileNotFoundError(f"Dataset with slug '{dataset_slug}' not found under {datasets_root}")
-
-    # Case 3: nothing specified -> attempt to pick latest or raise
-    raise ValueError("Either --dataset or --dataset-slug must be provided")
+    raise FileNotFoundError(
+        f"Dataset '{dataset_slug}' not found under {datasets_root} (not a path and no matching folder)"
+    )
 
 
 def find_index_files(dataset_dir: Path) -> Dict[str, IndexPaths]:
@@ -336,14 +345,13 @@ def render_html(summary_payload: Dict[str, Any], output_path: Path, report_name:
 
 def export_index_view(
     config: Config,
-    dataset: Optional[Path] = None,
-    dataset_slug: Optional[str] = None,
+    dataset_ref: Optional[str | Path] = None,
     root: Optional[Path] = None,
     index_types: Optional[List[str]] = None,
     output_dir: Optional[Path] = None,
 ) -> Path:
     datasets_root = resolve_datasets_root(config, root)
-    meta = discover_dataset(dataset, datasets_root, dataset_slug)
+    meta = discover_dataset(dataset_ref, datasets_root)
 
     index_paths = find_index_files(meta.path)
     selected_types = index_types or list(index_paths.keys())

@@ -288,16 +288,11 @@ def create_parser():
         "create_dashboard", help="Export single-file HTML report for dataset indexes"
     )
     create_dashboard_parser.add_argument(
-        "--dataset",
-        type=pathlib.Path,
-        default=None,
-        help="Path to dataset directory or its dataset.json",
-    )
-    create_dashboard_parser.add_argument(
-        "--dataset-slug",
-        type=str,
-        default=None,
-        help="Dataset slug (folder suffix after --)",
+        "dataset",
+        help=(
+            "Dataset: filesystem path (directory or dataset.json), slug (folder suffix after --), "
+            "or full folder name under --root when not an existing path"
+        ),
     )
     create_dashboard_parser.add_argument(
         "--root",
