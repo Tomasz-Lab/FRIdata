@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Type
 
 if TYPE_CHECKING:
     from toolbox.models.embedding.embedder.base_embedder import BaseEmbedder
-    from toolbox.utlis.logging import logger
 
 
 def _lazy_embedder_class(member: "EmbedderType") -> Type[BaseEmbedder]:
@@ -42,5 +41,4 @@ class EmbedderType(Enum):
         return _lazy_embedder_class(self)
 
     def create_embedder(self) -> BaseEmbedder:
-        logger.info(f"Loading embedding model: {self._value}")
         return self.embedder_class(model_name=self.value)
