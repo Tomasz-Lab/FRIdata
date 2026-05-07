@@ -67,7 +67,7 @@ class Embedding:
             self.structures_dataset.embedder_type = EmbedderType.ESM2_T33_650M
         
         # Get the embedder instance and run embedding
-        logger.info(f"Loading embedding model: {self.structures_dataset.embedder_type._value}")
+        logger.info(f"Loading embedding model: {self.structures_dataset.embedder_type.value}")
         embedder = self.structures_dataset.embedder_type.create_embedder()
         index_of_new_embeddings = embedder.embed(sequences, self.outputs_dir)
 
