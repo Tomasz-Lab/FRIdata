@@ -147,6 +147,23 @@ def configure_logging(verbose, log_file=None):
         logger.addFilter(VerboseFilter())
 
 
+
+
+def validate_inspect_h5_cli_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    """Reject invalid ``inspect_h5`` flag combinations after ``parse_args``."""
+    if getattr(args, "command", None) != "inspect_h5":
+        return
+    if getattr(args, "pdb_names", None) and getattr(args, "mode", None) not in (
+        "content",
+        "distogram",
+        "coordinates",
+        "embedding",
+    ):
+        parser.error(
+            "--name is only valid with --mode content|distogram|coordinates|embedding"
+        )
+
+
 def create_parser():
     parser = argparse.ArgumentParser(description="Create protein dataset")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
@@ -240,9 +257,19 @@ def create_parser():
     )
     inspect_h5_parser.add_argument(
         "--mode",
-        choices=["structure", "content", "keys"],
+        choices=[
+            "structure",
+            "content",
+            "keys",
+            "distogram",
+            "coordinates",
+            "embedding",
+        ],
         default="structure",
-        help="Display mode: structure (groups/datasets/shapes), content (PDB text via read_pdbs_from_h5), or keys (protein codes only)",
+        help=(
+            "structure: tree; keys: id list; content: PDB text (files group); "
+            "distogram|coordinates|embedding: numeric preview + stats when small"
+        ),
     )
     inspect_h5_parser.add_argument(
         "--name",
@@ -251,7 +278,8 @@ def create_parser():
         default=None,
         metavar="KEYS",
         help=(
-            "Comma-separated PDB keys to show (content mode only; must match keys in the H5). "
+            "Comma-separated keys (distogram/coordinates/embedding batches or PDB shards). "
+            "Only with --mode content|distogram|coordinates|embedding. "
             "Use inspect_h5 --mode keys to list keys."
         ),
     )
@@ -321,10 +349,7 @@ def create_parser():
 def main():
     parser = create_parser()
     args = parser.parse_args()
-
-    if args.command == "inspect_h5" and getattr(args, "pdb_names", None) is not None:
-        if args.mode != "content":
-            parser.error("--name is only valid with --mode content")
+    validate_inspect_h5_cli_args(args, parser)
 
     # Load config and raise if not found
     from toolbox.config import load_config
