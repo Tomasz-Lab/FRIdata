@@ -186,7 +186,10 @@ class CommandParser:
         from toolbox.scripts.archive import create_archive
 
         self._create_dataset_from_path_()
-        create_archive(self.structures_dataset)
+        create_archive(
+            self.structures_dataset,
+            keep_shard_zips=getattr(self.args, "keep_shard_zips", False),
+        )
 
     def inspect_h5(self):
         from toolbox.utlis.inspect_h5 import inspect_h5

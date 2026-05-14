@@ -243,7 +243,27 @@ def create_parser():
 
     create_archive_parser = subparsers.add_parser(
         "create_archive",
-        help="Write one PDB .zip per H5 shard under data_path/archives/<dataset>/",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        help=(
+            "Build one merged PDB .zip (archive_pdb_<dataset>_<timestamp>.zip) under "
+            "data_path/archives/<dataset>/. Only proteins listed in the dataset index "
+            "(per shard in dataset_reversed.idx) are included."
+        ),
+        epilog=(
+            "Working directory: a `mate` helper (if you use it) often cd's into "
+            "deepFRI2-toolbox-dev; after that, pass an absolute -p/--file-path to the "
+            "dataset directory (the folder containing dataset.json), or cd to "
+            "<data_path>/datasets first if you want to use a short folder name.\n"
+            "Invocation: run `python fridata.py create_archive ...` from the repo "
+            "unless fridata.py is installed on PATH."
+        ),
+    )
+    create_archive_parser.add_argument(
+        "--keep-shard-zips",
+        action="store_true",
+        help=(
+            "Keep per-shard zip files under _staging/ after merge (default: remove staging)"
+        ),
     )
     add_common_arguments(create_archive_parser)
 
