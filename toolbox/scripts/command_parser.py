@@ -142,9 +142,6 @@ class CommandParser:
 
         self.structures_dataset.generate_embeddings()
 
-    def load(self):
-        dataset = self._create_dataset_from_path_()
-        logger.info(dataset)
 
     def generate_sequence(self):
         self._create_dataset_from_path_()

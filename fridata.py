@@ -190,8 +190,6 @@ def create_parser():
     add_common_arguments(embedding_parser)
     add_embedder_argument(embedding_parser, required=True)
 
-    load_dataset_parser = subparsers.add_parser("load", help="Load a dataset from json")
-    add_common_arguments(load_dataset_parser)
 
     extract_sequence_and_coordinates_parser = subparsers.add_parser(
         "generate_sequence", help="Generate sequences for "
