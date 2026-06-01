@@ -189,6 +189,7 @@ class CommandParser:
         create_archive(
             self.structures_dataset,
             keep_shard_zips=getattr(self.args, "keep_shard_zips", False),
+            archive_types=getattr(self.args, "type", None),
         )
 
     def inspect_h5(self):

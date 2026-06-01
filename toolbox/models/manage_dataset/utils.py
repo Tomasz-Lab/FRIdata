@@ -170,7 +170,7 @@ def aggregate_results(
 #     return str(zip_path)
 #
 #
-# def create_pdb_zip_archive(path_for_batch: Path, results):
+# def write_batch_pdb_zip(path_for_batch: Path, results):
 #     zip_path = path_for_batch / 'pdb_files.zip'
 #     all_res_pdbs = results[0]
 #     all_contents = results[1]
@@ -282,8 +282,12 @@ def retrieve_pdb_chunk_to_h5(
             h5_task,
             workers=workers,
         )
-        # zip_task = client.submit(create_cif_files_zip_archive, path_for_batch, aggregated, pure=False)
-        # pdb_zip_task = client.submit(create_pdb_zip_archive, path_for_batch, aggregated, pure=False)
+        # from toolbox.models.manage_dataset.batch_structure_zips import (
+        #     write_batch_cif_zip,
+        #     write_batch_pdb_zip,
+        # )
+        # zip_task = client.submit(write_batch_cif_zip, path_for_batch, aggregated, pure=False)
+        # pdb_zip_task = client.submit(write_batch_pdb_zip, path_for_batch, aggregated, pure=False)
 
         # Compute the tasks
         pdb_ids, h5_file_path, downloaded_map = client.gather(

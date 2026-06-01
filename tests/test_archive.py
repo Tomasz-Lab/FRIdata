@@ -1,15 +1,22 @@
 import zipfile
 from pathlib import Path
 
+import h5py
+import numpy as np
 import pytest
 
+from fridata import create_parser
+from toolbox.models.manage_dataset.index.handle_index import create_index
 from toolbox.models.manage_dataset.utils import compress_and_save_h5
 from toolbox.scripts.archive import (
     _shard_zip_name,
+    create_archive,
     merge_shard_zips_flat,
     normalize_pdb_codes_for_h5,
     process_h5_file,
 )
+from toolbox.scripts.create_archive.numeric import create_numeric_archive
+from toolbox.scripts.create_archive.utils import normalize_archive_types
 
 
 def test_shard_zip_name_distinct_batches_same_basename():
@@ -175,3 +182,174 @@ def test_merge_shard_zips_flat_skips_duplicate_member(caplog, tmp_path):
     assert "Duplicate archive member" in caplog.text
     with zipfile.ZipFile(out, "r") as zf:
         assert zf.read("same.pdb") == b"first"
+
+
+class _FakeConfig:
+    def __init__(self, data_path: str):
+        self.data_path = data_path
+        self.separator = "-"
+
+
+class _FakeDataset:
+    def __init__(self, data_path: Path, name: str = "PDB-subset--test"):
+        self.config = _FakeConfig(str(data_path))
+        self._name = name
+        self._dataset_path = data_path / "datasets" / name
+        self._dataset_path.mkdir(parents=True, exist_ok=True)
+
+    def dataset_path(self):
+        return self._dataset_path
+
+    def dataset_dir_name(self):
+        return self._name
+
+
+def _write_embeddings_batch(path: Path, entries: dict[str, np.ndarray]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(path, "w") as hf:
+        for protein_id, array in entries.items():
+            hf.create_dataset(protein_id, data=array)
+
+
+def _write_coordinates_batch(path: Path, entries: dict[str, np.ndarray]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(path, "w") as hf:
+        for protein_id, array in entries.items():
+            group = hf.create_group(protein_id)
+            group.create_dataset("coords", data=array)
+
+
+def _write_distograms_batch(path: Path, entries: dict[str, np.ndarray]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(path, "w") as hf:
+        for protein_id, array in entries.items():
+            group = hf.create_group(protein_id)
+            group.create_dataset("distogram", data=array)
+
+
+def test_normalize_archive_types_accepts_all_and_comma_separated_values():
+    assert normalize_archive_types("all") == {
+        "coordinates",
+        "distograms",
+        "embeddings",
+        "structures",
+    }
+    assert normalize_archive_types("structures,embeddings") == {
+        "structures",
+        "embeddings",
+    }
+
+
+def test_cli_create_archive_type_parsing_accepts_multiple_values(tmp_path):
+    parser = create_parser()
+    dataset_path = tmp_path / "dataset"
+    dataset_path.mkdir()
+    args = parser.parse_args(
+        [
+            "create_archive",
+            "-p",
+            str(dataset_path),
+            "-t",
+            "structures,embeddings",
+        ]
+    )
+    assert args.command == "create_archive"
+    assert args.type == ["embeddings", "structures"]
+
+
+def test_cli_create_archive_type_parsing_rejects_unknown_value(tmp_path):
+    parser = create_parser()
+    dataset_path = tmp_path / "dataset"
+    dataset_path.mkdir()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "create_archive",
+                "-p",
+                str(dataset_path),
+                "-t",
+                "structures,unknown",
+            ]
+        )
+
+
+def test_create_numeric_archive_exports_embeddings_npz(tmp_path):
+    ds = _FakeDataset(tmp_path)
+    h5_path = tmp_path / "embeddings" / ds.dataset_dir_name() / "batch_0.h5"
+    first = np.arange(6, dtype=np.float32).reshape(2, 3)
+    second = np.ones((3, 2), dtype=np.float32)
+    _write_embeddings_batch(h5_path, {"protA": first, "protB": second})
+    create_index(
+        ds.dataset_path() / "embeddings.idx",
+        {"protA": str(h5_path), "protB": str(h5_path)},
+        ds.config.data_path,
+    )
+
+    out = create_numeric_archive(
+        ds,
+        tmp_path / "archives" / ds.dataset_dir_name(),
+        "20260102030405",
+        "embeddings",
+    )
+
+    assert out is not None
+    assert out.name == f"archive_embeddings_{ds.dataset_dir_name()}_20260102030405.npz"
+    loaded = np.load(out)
+    assert loaded["__protein_ids__"].tolist() == ["protA", "protB"]
+    np.testing.assert_array_equal(loaded["arr_00000000"], first)
+    np.testing.assert_array_equal(loaded["arr_00000001"], second)
+
+
+def test_create_numeric_archive_exports_coordinates_and_distograms(tmp_path):
+    ds = _FakeDataset(tmp_path)
+    coords_h5 = tmp_path / "coordinates" / ds.dataset_dir_name() / "batch_0_ca.h5"
+    dist_h5 = tmp_path / "distograms" / ds.dataset_dir_name() / "batch_0.h5"
+    coords = np.array([[1, 1.0, 2.0, 3.0]], dtype=np.float32)
+    dist = np.array([[0.0, 4.0], [4.0, 0.0]], dtype=np.float32)
+    _write_coordinates_batch(coords_h5, {"protA": coords})
+    _write_distograms_batch(dist_h5, {"protA": dist})
+    create_index(
+        ds.dataset_path() / "coordinates.idx",
+        {"protA": str(coords_h5)},
+        ds.config.data_path,
+    )
+    create_index(
+        ds.dataset_path() / "distograms.idx",
+        {"protA": str(dist_h5)},
+        ds.config.data_path,
+    )
+
+    out_dir = tmp_path / "archives" / ds.dataset_dir_name()
+    coords_out = create_numeric_archive(ds, out_dir, "20260102030405", "coordinates")
+    dist_out = create_numeric_archive(ds, out_dir, "20260102030405", "distograms")
+
+    assert coords_out is not None
+    assert dist_out is not None
+    np.testing.assert_array_equal(np.load(coords_out)["arr_00000000"], coords)
+    np.testing.assert_array_equal(np.load(dist_out)["arr_00000000"], dist)
+
+
+def test_create_archive_numeric_outputs_share_timestamp(tmp_path):
+    ds = _FakeDataset(tmp_path)
+    emb_h5 = tmp_path / "embeddings" / ds.dataset_dir_name() / "batch_0.h5"
+    coords_h5 = tmp_path / "coordinates" / ds.dataset_dir_name() / "batch_0_ca.h5"
+    _write_embeddings_batch(emb_h5, {"protA": np.ones((2, 2), dtype=np.float32)})
+    _write_coordinates_batch(
+        coords_h5, {"protA": np.ones((1, 4), dtype=np.float32)}
+    )
+    create_index(
+        ds.dataset_path() / "embeddings.idx",
+        {"protA": str(emb_h5)},
+        ds.config.data_path,
+    )
+    create_index(
+        ds.dataset_path() / "coordinates.idx",
+        {"protA": str(coords_h5)},
+        ds.config.data_path,
+    )
+
+    outputs = create_archive(ds, archive_types=["embeddings", "coordinates"])
+
+    assert set(outputs) == {"embeddings", "coordinates"}
+    timestamps = {path.stem.rsplit("_", 1)[-1] for path in outputs.values()}
+    assert len(timestamps) == 1

@@ -122,6 +122,16 @@ def _parse_comma_separated_pdb_names(value: str) -> list[str]:
     return names
 
 
+def _parse_archive_types(value: str) -> list[str]:
+    from toolbox.scripts.create_archive import ARCHIVE_TYPES, normalize_archive_types
+
+    try:
+        return sorted(normalize_archive_types(value))
+    except ValueError as exc:
+        valid = ", ".join(["all", *sorted(ARCHIVE_TYPES)])
+        raise argparse.ArgumentTypeError(f"{exc}. Choose from: {valid}") from exc
+
+
 def configure_logging(verbose, log_file=None):
     """Configure logging based on verbose flag and optional log file"""
     log_level = logging.DEBUG if verbose else logging.INFO
@@ -263,6 +273,17 @@ def create_parser():
         action="store_true",
         help=(
             "Keep per-shard zip files under _staging/ after merge (default: remove staging)"
+        ),
+    )
+    create_archive_parser.add_argument(
+        "-t",
+        "--type",
+        type=_parse_archive_types,
+        default=None,
+        metavar="name",
+        help=(
+            "Comma-separated archive outputs to create: all, structures, embeddings, "
+            "distograms, coordinates. Default: all."
         ),
     )
     add_common_arguments(create_archive_parser)

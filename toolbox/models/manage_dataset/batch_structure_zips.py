@@ -1,7 +1,11 @@
+"""Per-batch CIF/PDB zip writers used during dataset generation.
+
+Not used by the CLI ``fridata.py create_archive`` command (see ``toolbox.scripts.archive``).
+"""
+
 import os
 import zipfile
 from pathlib import Path
-import time
 
 
 def get_file_size_in_mb(file_path):
@@ -25,7 +29,7 @@ def save_file_sizes_and_names(zip_path, file_type):
             f.write(f"{file_info.filename}\n")
 
 
-def create_cif_files_zip_archive(path_for_batch: Path, results):
+def write_batch_cif_zip(path_for_batch: Path, results):
     zip_path = path_for_batch / "cif_files.zip"
     cif_files = results[2]
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
@@ -43,7 +47,7 @@ def create_cif_files_zip_archive(path_for_batch: Path, results):
     return str(zip_path)
 
 
-def create_pdb_zip_archive(path_for_batch: Path, results):
+def write_batch_pdb_zip(path_for_batch: Path, results):
     zip_path = path_for_batch / "pdb_files.zip"
     all_res_pdbs = results[0]
     all_contents = results[1]
