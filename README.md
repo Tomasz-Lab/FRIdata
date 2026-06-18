@@ -58,12 +58,9 @@ pytest ./tests
 
 ## Running on AFDB structures locally
 
-Requires having a directory with AFDB structures and a text file containing list of AFDB IDs with `\n` delimeter.
+Requires having a directory with AFDB structures and a text file containing list of AFDB IDs with `\n` delimeter. Assuming all steps from `Instalation and activation` succeded
 
 ```
-#
-# Assuming all steps from `Instalation and activation` succeded
-#
 FRIDATA_PATH="<repository path>"
 AFDB_PATH="<AFDB structures directory path>"
 IDS_PATH="<AFDB IDs file path>"
@@ -107,8 +104,10 @@ python3 -m pip install -e .
 2. Now FRIdata can be run as a CLI tool
 
 ```
-$ fridata <...>
-```3dc54 (Use ids_file tokens (e.g. plain UniProt) plus chain as the canonical dataset index keys)
+fridata <...>
+```
+
+(Use ids_file tokens (e.g. plain UniProt) plus chain as the canonical dataset index keys)
 
 ## Running on HPC
 
@@ -122,7 +121,7 @@ Prerequisites:
     - `AFDB_PATH`: path to AFDB structures (can be empty directory - structures will be fetched there)
     - `DATA_PATH`: path to the parent diretory of all generated output data
     - Optional ENV vars with default values:
-        - `COMMON_SLURM_PATH`: path to common_slurn.sh, defaults to `$DEEPFRI_PATH/FRIdata/scripts/hpc/common_slurm.sh`
+        - `COMMON_SLURM_PATH`: path to common_slurm.sh, defaults to `$DEEPFRI_PATH/FRIdata/scripts/hpc/common_slurm.sh`
         - `LAUNCH_WORKER_SLURM_PATH`: path to launch_worker_slurm.sh, defaults to `$DEEPFRI_PATH/FRIdata/scripts/hpc/launch_workers_slurm.sh`
         - `MEMORY_LIMIT`: memory limit per Dask worker, defaults to `288GiB`
         - `IP_INTERFACE`: network unix interface, where dask workers are connected. Defaults to `ens1f0`
@@ -151,7 +150,7 @@ chmod u+x -R scripts/hpc/cpu
 ./scripts/hpc/initialize_slurm.sh <path to .conda> [--cpu]
 ```
 
-4. Schedule SBatch script into the HPC with all the args specified. Operations to be chosen are: `sequences`, `coordinates`, `embeddings`
+4. Schedule sbatch script into the HPC with all the args specified. Operations to be chosen are: `sequences`, `coordinates`, `embeddings`
 
 
 For CPU:
