@@ -69,3 +69,59 @@ def test_esm():
 
 # TODO
 # Add tests for other embeddings (Ankh etc.)
+
+
+def test_embedding_run_persists_embedder_metadata(tmp_path):
+    import json
+    from unittest.mock import patch
+
+    from toolbox.config import Config
+    from toolbox.models.embedding.embedder.embedder_type import EmbedderType
+    from toolbox.models.manage_dataset.collection_type import CollectionType
+    from toolbox.models.manage_dataset.database_type import DatabaseType
+    from toolbox.models.manage_dataset.structures_dataset import StructuresDataset
+
+    config = Config(
+        data_path=str(tmp_path),
+        disto_type="CA",
+        disto_thr="inf",
+        separator="-",
+        batch_size=1000,
+    )
+    dataset = StructuresDataset(
+        db_type=DatabaseType.AFDB,
+        collection_type=CollectionType.subset,
+        version="embedder_metadata_test",
+        config=config,
+        embedder_type=None,
+        embedding_size=None,
+    )
+    dataset_path = dataset.dataset_path()
+    dataset_path.mkdir(parents=True)
+    dataset.save_dataset_metadata()
+
+    with patch(
+        "toolbox.models.embedding.embedding.search_embedding_indexes"
+    ) as mock_search, patch(
+        "toolbox.models.embedding.embedding.Embedding.missing_ids_to_fasta",
+        return_value={},
+    ), patch(
+        "toolbox.models.embedding.embedder.embedder_type.EmbedderType.create_embedder"
+    ) as mock_create_embedder, patch(
+        "toolbox.models.manage_dataset.index.handle_index.create_index"
+    ):
+        from toolbox.models.manage_dataset.index.handle_indexes import SearchIndexResult
+
+        mock_search.return_value = SearchIndexResult(
+            missing_protein_files={},
+            present={},
+            grouped_missing_proteins={},
+        )
+        mock_create_embedder.return_value.embed.return_value = {}
+
+        dataset.embedder_type = EmbedderType.ESMC_600M
+        dataset.generate_embeddings()
+
+    saved = json.loads((dataset_path / "dataset.json").read_text())
+    assert saved["embedder_type"] == "esmc_600m"
+    assert saved["embedding_size"] == 1152

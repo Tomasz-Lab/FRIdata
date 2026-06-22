@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from toolbox.models.manage_dataset import extract_archive as extract_archive_mod
 from toolbox.models.manage_dataset.extract_archive import (
     build_stem_to_paths,
     pick_single_path_for_canonical_id,
@@ -136,3 +137,67 @@ def test_resolve_strips_id_not_applied_use_raw_match(tmp_path: Path) -> None:
     inv = build_stem_to_paths(tmp_path)
     assert resolve_id(" Q5VSL9", inv) == []
     assert resolve_id("Q5VSL9", inv) != []
+
+
+def test_build_stem_to_paths_nested_subdir(tmp_path: Path) -> None:
+    nested = tmp_path / "batch" / "nested"
+    f = nested / "AF-Q5VSL9-F1-model_v4.cif"
+    _touch(f)
+    inv = build_stem_to_paths(tmp_path)
+    assert resolve_id("Q5VSL9", inv)[0].resolve() == f.resolve()
+
+
+def test_build_stem_to_paths_cache_hit(tmp_path: Path, monkeypatch) -> None:
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setattr(extract_archive_mod, "_stem_cache_dir", lambda: cache_dir)
+    monkeypatch.delenv("DEEPFRI_DISABLE_STEM_CACHE", raising=False)
+
+    _touch(tmp_path / "Q5VSL9.cif")
+    first = build_stem_to_paths(tmp_path, use_cache=True)
+    assert len(first) == 1
+
+    second = build_stem_to_paths(tmp_path, use_cache=True)
+    assert second == first
+
+
+def test_build_stem_to_paths_cache_invalidated_on_change(
+    tmp_path: Path, monkeypatch
+) -> None:
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setattr(extract_archive_mod, "_stem_cache_dir", lambda: cache_dir)
+    monkeypatch.delenv("DEEPFRI_DISABLE_STEM_CACHE", raising=False)
+
+    _touch(tmp_path / "Q5VSL9.cif")
+    build_stem_to_paths(tmp_path, use_cache=True)
+
+    _touch(tmp_path / "NEW.cif")
+    inv = build_stem_to_paths(tmp_path, use_cache=True)
+    assert "NEW" in inv
+    assert "Q5VSL9" in inv
+
+
+def test_build_stem_to_paths_cache_invalidated_on_new_subdir(
+    tmp_path: Path, monkeypatch
+) -> None:
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setattr(extract_archive_mod, "_stem_cache_dir", lambda: cache_dir)
+    monkeypatch.delenv("DEEPFRI_DISABLE_STEM_CACHE", raising=False)
+
+    _touch(tmp_path / "Q5VSL9.cif")
+    build_stem_to_paths(tmp_path, use_cache=True)
+
+    _touch(tmp_path / "batch2" / "NEW.cif")
+    inv = build_stem_to_paths(tmp_path, use_cache=True)
+    assert "NEW" in inv
+
+
+def test_build_stem_to_paths_cache_can_be_disabled(tmp_path: Path, monkeypatch) -> None:
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setattr(extract_archive_mod, "_stem_cache_dir", lambda: cache_dir)
+
+    _touch(tmp_path / "Q5VSL9.cif")
+    build_stem_to_paths(tmp_path, use_cache=True)
+    (tmp_path / "Q5VSL9.cif").unlink()
+
+    monkeypatch.setenv("DEEPFRI_DISABLE_STEM_CACHE", "1")
+    assert build_stem_to_paths(tmp_path, use_cache=True) == {}

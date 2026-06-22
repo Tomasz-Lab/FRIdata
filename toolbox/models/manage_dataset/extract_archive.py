@@ -1,6 +1,9 @@
+import hashlib
 import os
+import pickle
 import time
-from typing import Iterable, List, Optional, Tuple, Dict, Pattern, Union
+from contextlib import nullcontext
+from typing import Iterable, List, NamedTuple, Optional, Tuple, Dict, Union
 import zipfile
 import tarfile
 from pathlib import Path
@@ -10,6 +13,7 @@ from toolbox.models.manage_dataset.index.handle_index import add_new_files_to_in
 from toolbox.models.utils.create_client import total_workers
 
 from toolbox.models.manage_dataset.compute_batches import ComputeBatches
+from toolbox.models.manage_dataset.create_dataset_timing import get_active_timings
 from toolbox.models.manage_dataset.utils import (
     compress_and_save_h5,
     mkdir_for_batches,
@@ -60,22 +64,175 @@ def is_archive(path):
     return zipfile.is_zipfile(path) or tarfile.is_tarfile(path)
 
 
-def build_stem_to_paths(extracted_path: Path) -> Dict[str, List[Path]]:
+_STEM_CACHE_VERSION = 1
+_STEM_CACHE_ENV_DISABLE = "DEEPFRI_DISABLE_STEM_CACHE"
+_STEM_CACHE_RECOUNT_MAX_FILES = 10_000
+
+
+def _stem_cache_enabled() -> bool:
+    return os.environ.get(_STEM_CACHE_ENV_DISABLE, "").lower() not in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _stem_cache_dir() -> Path:
+    cache_home = os.environ.get("XDG_CACHE_HOME")
+    root = Path(cache_home) if cache_home else Path.home() / ".cache"
+    return root / "deepfri" / "stem_to_paths"
+
+
+def _stem_cache_file(base: Path) -> Path:
+    digest = hashlib.sha256(str(base).encode()).hexdigest()
+    return _stem_cache_dir() / f"{digest}.pkl"
+
+
+def _scan_stem_to_paths(
+    base: Path,
+) -> Tuple[Dict[str, List[str]], List[Tuple[str, int, int]]]:
+    """Walk base and return stem index (string paths) plus per-directory metadata."""
+    stem_to_paths: Dict[str, List[str]] = {}
+    dir_fingerprints: List[Tuple[str, int, int]] = []
+    base_str = str(base)
+    for dirpath, _, filenames in os.walk(base, followlinks=False):
+        rel = os.path.relpath(dirpath, base_str)
+        if rel == ".":
+            rel = ""
+        n_structure_files = sum(
+            1
+            for name in filenames
+            if name.lower().endswith(".cif") or name.lower().endswith(".pdb")
+        )
+        try:
+            mtime_ns = os.stat(dirpath, follow_symlinks=False).st_mtime_ns
+        except OSError:
+            return {}, []
+        dir_fingerprints.append((rel, mtime_ns, n_structure_files))
+        for name in filenames:
+            low = name.lower()
+            if not (low.endswith(".cif") or low.endswith(".pdb")):
+                continue
+            p = Path(dirpath) / name
+            stem_to_paths.setdefault(p.stem, []).append(str(p))
+    dir_fingerprints.sort()
+    return stem_to_paths, dir_fingerprints
+
+
+def _dir_fingerprints_valid(
+    base: Path, fingerprints: List[Tuple[str, int, int]]
+) -> bool:
+    stored_dirs = {rel for rel, _, _ in fingerprints}
+    try:
+        with os.scandir(base) as it:
+            for entry in it:
+                if not entry.is_dir(follow_symlinks=False):
+                    continue
+                if entry.name not in stored_dirs:
+                    return False
+    except OSError:
+        return False
+
+    for rel, mtime_ns, n_structure_files in fingerprints:
+        path = base if not rel else base / rel
+        try:
+            st = os.stat(path, follow_symlinks=False)
+        except OSError:
+            return False
+        if st.st_mtime_ns != mtime_ns:
+            return False
+        if n_structure_files <= _STEM_CACHE_RECOUNT_MAX_FILES:
+            with os.scandir(path) as it:
+                actual = sum(
+                    1
+                    for entry in it
+                    if entry.is_file(follow_symlinks=False)
+                    and entry.name.lower().endswith((".cif", ".pdb"))
+                )
+            if actual != n_structure_files:
+                return False
+    return True
+
+
+def _load_stem_cache(base: Path) -> Optional[Dict[str, List[str]]]:
+    cache_file = _stem_cache_file(base)
+    if not cache_file.is_file():
+        return None
+    try:
+        with cache_file.open("rb") as f:
+            payload = pickle.load(f)
+    except (OSError, pickle.UnpicklingError, KeyError, TypeError, ValueError):
+        return None
+    if payload.get("version") != _STEM_CACHE_VERSION:
+        return None
+    if payload.get("base") != str(base):
+        return None
+    fingerprints = payload.get("dir_fingerprints")
+    stem_to_paths = payload.get("stem_to_paths")
+    if not isinstance(fingerprints, list) or not isinstance(stem_to_paths, dict):
+        return None
+    if not _dir_fingerprints_valid(base, fingerprints):
+        return None
+    return stem_to_paths
+
+
+def _save_stem_cache(
+    base: Path,
+    stem_to_paths: Dict[str, List[str]],
+    dir_fingerprints: List[Tuple[str, int, int]],
+) -> None:
+    cache_file = _stem_cache_file(base)
+    payload = {
+        "version": _STEM_CACHE_VERSION,
+        "base": str(base),
+        "dir_fingerprints": dir_fingerprints,
+        "stem_to_paths": stem_to_paths,
+    }
+    try:
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        tmp = cache_file.with_suffix(".tmp")
+        with tmp.open("wb") as f:
+            pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+        tmp.replace(cache_file)
+    except OSError as exc:
+        logger.debug(f"Could not write stem index cache {cache_file}: {exc}")
+
+
+def _paths_from_stem_cache(stem_to_paths: Dict[str, List[str]]) -> Dict[str, List[Path]]:
+    return {
+        stem: [Path(path_str) for path_str in paths]
+        for stem, paths in stem_to_paths.items()
+    }
+
+
+def build_stem_to_paths(extracted_path: Path, *, use_cache: bool = True) -> Dict[str, List[Path]]:
     """
     Collect all .pdb / .cif under extracted_path, keyed by filename stem.
-    Paths are resolved to absolute for reliable opening (archive vs directory).
+    Paths are absolute for reliable opening (archive vs directory).
+
+    Results are cached on disk (XDG cache dir) keyed by the resolved input path.
+    Invalidation uses directory mtimes from the last scan. Set
+    ``DEEPFRI_DISABLE_STEM_CACHE=1`` or ``use_cache=False`` to skip the cache.
     """
-    stem_to_paths: Dict[str, List[Path]] = {}
     base = extracted_path.resolve()
-    if not base.exists():
-        return stem_to_paths
-    for pattern in ("*.pdb", "*.cif"):
-        for p in base.rglob(pattern):
-            if not p.is_file():
-                continue
-            resolved = p.resolve()
-            stem_to_paths.setdefault(resolved.stem, []).append(resolved)
-    return stem_to_paths
+    if not base.is_dir():
+        return {}
+
+    cache_on = use_cache and _stem_cache_enabled()
+    if cache_on:
+        cached = _load_stem_cache(base)
+        if cached is not None:
+            logger.debug(
+                f"Loaded stem index from cache for {base} ({len(cached)} stems)"
+            )
+            return _paths_from_stem_cache(cached)
+
+    stem_to_paths, dir_fingerprints = _scan_stem_to_paths(base)
+    if cache_on and dir_fingerprints:
+        _save_stem_cache(base, stem_to_paths, dir_fingerprints)
+        logger.debug(f"Saved stem index cache for {base} ({len(stem_to_paths)} stems)")
+
+    return _paths_from_stem_cache(stem_to_paths)
 
 
 def _pick_path_prefer_cif(paths: List[Path]) -> Path:
@@ -86,46 +243,106 @@ def _pick_path_prefer_cif(paths: List[Path]) -> Path:
     return sorted(paths, key=lambda x: str(x))[0]
 
 
-def _paths_at_max_af_version(
-    stem_to_paths: Dict[str, List[Path]], pattern: Pattern[str]
+# Parse an AlphaFold stem into (accession, fragment, version) in one pass.
+_AF_STEM_RE = re.compile(r"^AF-(.+)-F(\d+)-model_v(\d+)$")
+# Trailing "-<digits>" of an accession marks an isoform suffix (loose match base).
+_TRAILING_ISOFORM_RE = re.compile(r"-\d+$")
+
+
+class StemResolutionIndex(NamedTuple):
+    """
+    Pre-computed lookup tables that turn per-id resolution into O(1) dict lookups
+    instead of scanning every stem with a fresh regex for each requested id.
+
+    - ``picked_by_stem``: stem -> single chosen path (prefer .cif over .pdb).
+    - ``af_exact``: accession -> [(version, stem)] for ``AF-{accession}-F*-model_v*``.
+    - ``af_loose``: isoform base -> [(version, stem)] where accession == ``{base}-{digits}``.
+    """
+
+    stem_to_paths: Dict[str, List[Path]]
+    picked_by_stem: Dict[str, Path]
+    af_exact: Dict[str, List[Tuple[int, str]]]
+    af_loose: Dict[str, List[Tuple[int, str]]]
+
+
+def build_resolution_index(
+    stem_to_paths: Dict[str, List[Path]],
+    picked_by_stem: Optional[Dict[str, Path]] = None,
+) -> StemResolutionIndex:
+    """
+    Index all stems once so requested ids can be resolved by dict lookup.
+
+    This replaces the previous approach of compiling and running two regexes
+    against every stem for each requested id (O(ids * stems)) with a single
+    pass over the stems (O(stems)) plus O(1) lookups per id.
+    """
+    if picked_by_stem is None:
+        picked_by_stem = {
+            stem: _pick_path_prefer_cif(paths) for stem, paths in stem_to_paths.items()
+        }
+
+    af_exact: Dict[str, List[Tuple[int, str]]] = {}
+    af_loose: Dict[str, List[Tuple[int, str]]] = {}
+    for stem in stem_to_paths:
+        m = _AF_STEM_RE.match(stem)
+        if not m:
+            continue
+        accession = m.group(1)
+        version = int(m.group(3))
+        af_exact.setdefault(accession, []).append((version, stem))
+        iso = _TRAILING_ISOFORM_RE.search(accession)
+        if iso:
+            base = accession[: iso.start()]
+            af_loose.setdefault(base, []).append((version, stem))
+
+    return StemResolutionIndex(stem_to_paths, picked_by_stem, af_exact, af_loose)
+
+
+def _max_version_paths(
+    group: List[Tuple[int, str]], picked_by_stem: Dict[str, Path]
 ) -> List[Path]:
     """
-    Match stems with pattern groups: (fragment F, version V).
-    Pick the globally highest V, then return one path per matching stem at that V
-    (prefer .cif when a stem has multiple extensions).
+    From [(version, stem)], pick the globally highest version and return one path
+    per stem at that version (sorted by stem for deterministic ordering).
     """
-    rows: List[Tuple[int, int, str]] = []
-    for stem in stem_to_paths:
-        m = pattern.match(stem)
-        if m:
-            fragment = int(m.group(1))
-            version = int(m.group(2))
-            rows.append((version, fragment, stem))
-    if not rows:
+    if not group:
         return []
-    max_v = max(r[0] for r in rows)
-    stems_at_max = sorted({r[2] for r in rows if r[0] == max_v})
-    return [_pick_path_prefer_cif(stem_to_paths[s]) for s in stems_at_max]
+    max_v = max(v for v, _ in group)
+    stems_at_max = sorted({stem for v, stem in group if v == max_v})
+    return [picked_by_stem[s] for s in stems_at_max]
+
+
+def resolve_id_with_index(requested_id: str, index: StemResolutionIndex) -> List[Path]:
+    """
+    Resolve a requested protein id against a pre-built ``StemResolutionIndex``.
+
+    1) Exact stem match (prefer .cif over .pdb).
+    2) AF exact: AF-{id}-F{N}-model_v{V} — highest V, all fragments at that V.
+    3) AF loose (isoform): AF-{id}-{digits}-F{N}-model_v{V} — same version rule.
+    """
+    if requested_id in index.stem_to_paths:
+        return [index.picked_by_stem[requested_id]]
+
+    exact = index.af_exact.get(requested_id)
+    if exact:
+        return _max_version_paths(exact, index.picked_by_stem)
+
+    loose = index.af_loose.get(requested_id)
+    if loose:
+        return _max_version_paths(loose, index.picked_by_stem)
+
+    return []
 
 
 def resolve_id(requested_id: str, stem_to_paths: Dict[str, List[Path]]) -> List[Path]:
     """
     Resolve a requested protein id to file path(s) under input_path / extracted tree.
 
-    1) Exact stem match (prefer .cif over .pdb).
-    2) AF exact: AF-{id}-F{N}-model_v{V} — highest V, all fragments at that V.
-    3) AF loose (isoform): AF-{id}-{digits}-F{N}-model_v{V} — same version rule.
+    Convenience wrapper that builds a one-off index; for resolving many ids against
+    the same stem set, build a :class:`StemResolutionIndex` once and call
+    :func:`resolve_id_with_index`.
     """
-    if requested_id in stem_to_paths:
-        return [_pick_path_prefer_cif(stem_to_paths[requested_id])]
-
-    af_exact = re.compile(rf"^AF-{re.escape(requested_id)}-F(\d+)-model_v(\d+)$")
-    found = _paths_at_max_af_version(stem_to_paths, af_exact)
-    if found:
-        return found
-
-    af_loose = re.compile(rf"^AF-{re.escape(requested_id)}-\d+-F(\d+)-model_v(\d+)$")
-    return _paths_at_max_af_version(stem_to_paths, af_loose)
+    return resolve_id_with_index(requested_id, build_resolution_index(stem_to_paths))
 
 
 _AF_FRAGMENT_NUM_RE = re.compile(r"-F(\d+)-model_v\d+$")
@@ -166,7 +383,12 @@ def save_extracted_files(
     pdb_repo_path = structures_dataset.structures_path()
 
     extracted_path = Path(extracted_path)
-    stem_to_paths = build_stem_to_paths(extracted_path)
+    timings = get_active_timings()
+    if timings is not None:
+        with timings.measure("build_stem_to_paths"):
+            stem_to_paths = build_stem_to_paths(extracted_path)
+    else:
+        stem_to_paths = build_stem_to_paths(extracted_path)
     picked_by_stem = {
         stem: _pick_path_prefer_cif(paths) for stem, paths in stem_to_paths.items()
     }
@@ -189,18 +411,21 @@ def save_extracted_files(
         seen_resolved: set[str] = set()
         missing_files = []
 
-        for raw_id in ids:
-            rid = raw_id.strip()
-            resolved_paths = resolve_id(rid, stem_to_paths)
-            if not resolved_paths:
-                missing_files.append(raw_id)
-                continue
-            chosen = pick_single_path_for_canonical_id(resolved_paths)
-            key = str(chosen.resolve())
-            if key not in seen_resolved:
-                seen_resolved.add(key)
-                wanted_items.append((key, rid))
-                canonical_base_to_source_name[rid] = chosen.name
+        resolve_ctx = timings.measure("resolve_requested_ids") if timings else nullcontext()
+        with resolve_ctx:
+            resolution_index = build_resolution_index(stem_to_paths, picked_by_stem)
+            for raw_id in ids:
+                rid = raw_id.strip()
+                resolved_paths = resolve_id_with_index(rid, resolution_index)
+                if not resolved_paths:
+                    missing_files.append(raw_id)
+                    continue
+                chosen = pick_single_path_for_canonical_id(resolved_paths)
+                key = str(chosen.resolve())
+                if key not in seen_resolved:
+                    seen_resolved.add(key)
+                    wanted_items.append((key, rid))
+                    canonical_base_to_source_name[rid] = chosen.name
 
         logger.info(
             f"Resolved {len(wanted_items)} file path(s), {len(missing_files)} missing "
@@ -208,7 +433,11 @@ def save_extracted_files(
         )
         chunks = list(structures_dataset.chunk(wanted_items))
 
-    mkdir_for_batches(pdb_repo_path, len(chunks))
+    if timings is not None:
+        with timings.measure("mkdir_for_batches"):
+            mkdir_for_batches(pdb_repo_path, len(chunks))
+    else:
+        mkdir_for_batches(pdb_repo_path, len(chunks))
 
     new_files_index = {}
 
@@ -218,7 +447,12 @@ def save_extracted_files(
         )
 
     def collect(result):
-        downloaded_pdbs, file_path = result
+        if len(result) == 3:
+            downloaded_pdbs, file_path, worker_timings = result
+            if timings is not None:
+                timings.merge_worker_timings(worker_timings)
+        else:
+            downloaded_pdbs, file_path = result
         new_files_index.update({k: file_path for k in downloaded_pdbs})
 
     compute_batches = ComputeBatches(
@@ -259,8 +493,30 @@ def save_extracted_files(
             input_structures_index[id_with_chain] = file_path.name
 
     try:
-        add_new_files_to_index(structures_dataset.dataset_index_file_path(), new_files_index, structures_dataset.config.data_path)
-        create_index(structures_dataset.input_structures_index_path(), input_structures_index, structures_dataset.config.data_path)
+        if timings is not None:
+            with timings.measure("update_dataset_index"):
+                add_new_files_to_index(
+                    structures_dataset.dataset_index_file_path(),
+                    new_files_index,
+                    structures_dataset.config.data_path,
+                )
+            with timings.measure("update_input_structures_index"):
+                create_index(
+                    structures_dataset.input_structures_index_path(),
+                    input_structures_index,
+                    structures_dataset.config.data_path,
+                )
+        else:
+            add_new_files_to_index(
+                structures_dataset.dataset_index_file_path(),
+                new_files_index,
+                structures_dataset.config.data_path,
+            )
+            create_index(
+                structures_dataset.input_structures_index_path(),
+                input_structures_index,
+                structures_dataset.config.data_path,
+            )
     except Exception as e:
         logger.error(f"Failed to update index: {e}")
     
@@ -271,40 +527,44 @@ def retrieve_protein_file_to_h5(
     path_for_batch: Path,
     pdb_ids: Iterable[Union[str, Tuple[str, str]]],
     workers: List[str] = None,
-) -> Tuple[List[str], str]:
+) -> Tuple[List[str], str, Dict[str, float]]:
     with worker_client() as client:
-        start_time = time.time()
+        start_time = time.perf_counter()
 
-        pdb_futures = client.map(retrieve_single_file, pdb_ids, workers=workers)
-        converted_pdb_futures = client.map(file_to_pdb, pdb_futures, workers=workers)
+        read_futures = client.map(retrieve_single_file, pdb_ids, workers=workers)
+        converted_pdb_futures = client.map(file_to_pdb, read_futures, workers=workers)
         download_start_time = time.time()
-        aggregated = client.submit(
+        aggregated_future = client.submit(
             aggregate_results,
             converted_pdb_futures,
             download_start_time,
             workers=workers,
         )
+        aggregated = client.gather(aggregated_future)
+        pipeline_time = time.perf_counter() - start_time
 
-        # Create delayed tasks for H5 and ZIP creation
-        h5_task = client.submit(
+        h5_start = time.perf_counter()
+        h5_file_path = client.submit(
             compress_and_save_h5,
             path_for_batch,
             aggregated,
             pure=False,
             workers=workers,
+        ).result()
+        pdb_ids_out = aggregated[0]
+        h5_time = time.perf_counter() - h5_start
+
+        total_time = pipeline_time + h5_time
+        logger.info(
+            f"Total processing time {path_for_batch.stem}: {format_time(total_time)} "
+            f"(extract {format_time(pipeline_time)}, h5 {format_time(h5_time)})"
         )
-        get_ids_task = client.submit(
-            lambda results: results[0], aggregated, workers=workers
-        )
 
-        # Compute the tasks
-        pdb_ids, h5_file_path = client.gather([get_ids_task, h5_task])
-
-        end_time = time.time()
-        total_time = end_time - start_time
-        logger.info(f"Total processing time {path_for_batch.stem}: {format_time(total_time)}")
-
-        return pdb_ids, h5_file_path
+        worker_timings = {
+            "protein_extraction_pipeline": pipeline_time,
+            "h5_save": h5_time,
+        }
+        return pdb_ids_out, h5_file_path, worker_timings
 
 
 def retrieve_single_file(

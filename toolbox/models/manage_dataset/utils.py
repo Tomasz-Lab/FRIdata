@@ -230,6 +230,78 @@ def canonical_afdb_uniprot_id(uniprot_id: str) -> str:
     return s
 
 
+# Same pattern as biotite.database.afdb.download._UNIPROT_PATTERN
+_AFDB_UNIPROT_ACCESSION_RE = re.compile(
+    r"[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}"
+)
+
+
+def extract_afdb_uniprot_id(uniprot_id: str) -> Optional[str]:
+    """Return the UniProt accession biotite would use for AFDB fetch, or None if absent."""
+    match = _AFDB_UNIPROT_ACCESSION_RE.search(uniprot_id.strip())
+    return match.group(0) if match else None
+
+
+def is_afdb_downloadable_id(uniprot_id: str) -> bool:
+    """True when biotite can extract a UniProt accession for AFDB API download."""
+    return extract_afdb_uniprot_id(uniprot_id) is not None
+
+
+def partition_afdb_download_ids(
+    ids: Iterable[str],
+) -> Tuple[List[str], List[str]]:
+    """
+    Split ids into those worth sending to the AFDB API vs known-invalid accessions.
+
+    Skips entries with no extractable UniProt accession (e.g. URS* RNA, CPX complexes)
+    that would fail immediately in biotite with 'Cannot extract AFDB identifier'.
+    """
+    downloadable: List[str] = []
+    skipped: List[str] = []
+    for raw_id in ids:
+        if is_afdb_downloadable_id(raw_id):
+            downloadable.append(raw_id)
+        else:
+            skipped.append(raw_id)
+    return downloadable, skipped
+
+
+_afdb_prefilter_installed = False
+
+
+def install_afdb_download_prefilter() -> None:
+    """Monkey-patch AFDB download to drop non-UniProt ids before chunking/API calls."""
+    global _afdb_prefilter_installed
+    if _afdb_prefilter_installed:
+        return
+    _afdb_prefilter_installed = True
+
+    from toolbox.models.manage_dataset import structures_dataset as sd
+
+    orig_download_afdb = sd.StructuresDataset._download_afdb_
+
+    def _download_afdb_with_prefilter(self, ids: List[str]):
+        downloadable_ids, skipped_ids = partition_afdb_download_ids(ids)
+        if skipped_ids:
+            logger.info(
+                "Skipping %s AFDB ID(s) with no downloadable UniProt accession "
+                "(e.g. URS* RNA, CPX complexes)",
+                len(skipped_ids),
+            )
+            logger.debug(
+                "Skipped non-downloadable AFDB IDs (first 10): %s",
+                skipped_ids[:10],
+            )
+        if not downloadable_ids:
+            return skipped_ids if skipped_ids else None
+        result = orig_download_afdb(self, downloadable_ids)
+        if skipped_ids:
+            return skipped_ids + result if result else skipped_ids
+        return result
+
+    sd.StructuresDataset._download_afdb_ = _download_afdb_with_prefilter
+
+
 def downloaded_structures_map_afdb_fetched(
     successful_downloads: List[str],
     h5_file_path: Optional[str],
@@ -245,56 +317,46 @@ def retrieve_pdb_chunk_to_h5(
     pdb_ids: Iterable[str],
     is_binary: bool,
     workers: List[str] = None,
-) -> Tuple[List[str], str, Dict[str, str]]:
+) -> Tuple[List[str], str, Dict[str, str], Dict[str, float]]:
     with worker_client() as client:
-        # start_time = time.time()
+        start_time = time.perf_counter()
+        map_read = retrieve_binary_cif if is_binary else retrieve_cif
+        map_convert = binary_cif_to_pdbs if is_binary else cif_to_pdbs
 
-        pdb_futures = client.map(
-            retrieve_binary_cif if is_binary else retrieve_cif, pdb_ids, workers=workers
-        )
-        converted_pdb_futures = client.map(
-            binary_cif_to_pdbs if is_binary else cif_to_pdbs,
-            pdb_futures,
-            workers=workers,
-        )
+        read_futures = client.map(map_read, pdb_ids, workers=workers)
+        converted_pdb_futures = client.map(map_convert, read_futures, workers=workers)
         download_start_time = time.time()
-        aggregated = client.submit(
+        aggregated_future = client.submit(
             aggregate_results,
             converted_pdb_futures,
             download_start_time,
             workers=workers,
         )
+        aggregated = client.gather(aggregated_future)
+        pipeline_time = time.perf_counter() - start_time
 
-        # Create delayed tasks for H5 and ZIP creation
-        h5_task = client.submit(
+        h5_start = time.perf_counter()
+        h5_file_path = client.submit(
             compress_and_save_h5,
             path_for_batch,
             aggregated,
             pure=False,
             workers=workers,
-        )
-        get_ids_task = client.submit(
-            lambda results: results[0], aggregated, workers=workers
-        )
-        downloaded_map_task = client.submit(
-            downloaded_structures_map_rcsb,
-            aggregated,
-            h5_task,
-            workers=workers,
-        )
-        # zip_task = client.submit(create_cif_files_zip_archive, path_for_batch, aggregated, pure=False)
-        # pdb_zip_task = client.submit(create_pdb_zip_archive, path_for_batch, aggregated, pure=False)
+        ).result()
+        downloaded_map = downloaded_structures_map_rcsb(aggregated, h5_file_path)
+        h5_time = time.perf_counter() - h5_start
 
-        # Compute the tasks
-        pdb_ids, h5_file_path, downloaded_map = client.gather(
-            [get_ids_task, h5_task, downloaded_map_task]
+        pdb_ids_out = aggregated[0]
+        logger.info(
+            f"Total processing time {path_for_batch.stem}: {format_time(pipeline_time + h5_time)} "
+            f"(extract {format_time(pipeline_time)}, h5 {format_time(h5_time)})"
         )
 
-        # end_time = time.time()
-        # total_time = end_time - start_time
-        # logger.info(f"Total processing time {path_for_batch.stem}: {format_time(total_time)}")
-
-        return pdb_ids, h5_file_path or "", downloaded_map or {}
+        worker_timings = {
+            "protein_extraction_pipeline": pipeline_time,
+            "h5_save": h5_time,
+        }
+        return pdb_ids_out, h5_file_path or "", downloaded_map or {}, worker_timings
 
 
 def fetch_one_afdb(
@@ -315,6 +377,11 @@ def fetch_one_afdb(
     Returns:
         Tuple of (uniprot_id, None) on success or (uniprot_id, exception) on failure
     """
+    if not is_afdb_downloadable_id(uniprot_id):
+        error = ValueError(f"Cannot extract AFDB identifier from '{uniprot_id}'")
+        logger.debug("Skipping non-downloadable AFDB ID %s", uniprot_id)
+        return uniprot_id, error
+
     last_error: Optional[Exception] = None
     attempts = max(1, int(max_attempts))
 
@@ -365,10 +432,20 @@ def retrieve_afdb_chunk_to_h5_concurrent(
           - list of missing UniProt IDs from the input chunk (retry candidates)
           - map of UniProt id -> pdbs.h5 path for successful biotite downloads (empty if no H5)
     """
-    chunk_ids = list(uniprot_ids)
-    if not chunk_ids:
+    input_ids = list(uniprot_ids)
+    if not input_ids:
         return [], "", [], {}
-    
+
+    downloadable_ids, skipped_ids = partition_afdb_download_ids(input_ids)
+    if skipped_ids:
+        logger.debug(
+            "Skipping %s non-downloadable AFDB ID(s) in chunk (e.g. URS* RNA, CPX complexes)",
+            len(skipped_ids),
+        )
+    chunk_ids = downloadable_ids
+    if not chunk_ids:
+        return [], "", skipped_ids, {}
+
     temp_dir = None
     try:
         # Create temporary directory for downloading CIF files
@@ -398,7 +475,7 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         
         if not successful_downloads:
             logger.warning(f"No AFDB structures were successfully downloaded for chunk (all {len(chunk_ids)} IDs failed)")
-            return [], "", chunk_ids, {}
+            return [], "", skipped_ids + chunk_ids, {}
         
         if failed_downloads:
             logger.warning(f"Failed to download {len(failed_downloads)} out of {len(chunk_ids)} IDs")
@@ -415,7 +492,7 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         
         if not cif_files:
             logger.warning(f"No CIF files found in temp directory after download")
-            return [], "", chunk_ids, {}
+            return [], "", skipped_ids + chunk_ids, {}
 
         chunk_ids_set = set(chunk_ids)
         
@@ -455,15 +532,16 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         # Save to HDF5
         if len(all_res_pdbs) == 0 or len(all_contents) == 0:
             logger.warning("No PDB structures to save")
-            return [], "", chunk_ids, {}
+            return [], "", skipped_ids + chunk_ids, {}
         
         results = (all_res_pdbs, all_contents, [])
         h5_file_path = compress_and_save_h5(path_for_batch, results)
         
         if h5_file_path is None:
-            return [], "", chunk_ids, {}
+            return [], "", skipped_ids + chunk_ids, {}
         
         missing_ids = [uniprot_id for uniprot_id in chunk_ids if uniprot_id not in succeeded_uniprot_ids]
+        missing_ids.extend(skipped_ids)
         return (
             all_res_pdbs,
             h5_file_path,
@@ -497,10 +575,19 @@ def retrieve_afdb_chunk_to_h5(
     Returns:
         Tuple of (chain IDs, path to HDF5 file, downloaded_structures map for biotite fetches)
     """
-    chunk_ids = list(uniprot_ids)
+    input_ids = list(uniprot_ids)
+    if not input_ids:
+        return [], "", {}
+
+    chunk_ids, skipped_ids = partition_afdb_download_ids(input_ids)
+    if skipped_ids:
+        logger.debug(
+            "Skipping %s non-downloadable AFDB ID(s) in chunk (e.g. URS* RNA, CPX complexes)",
+            len(skipped_ids),
+        )
     if not chunk_ids:
         return [], "", {}
-    
+
     temp_dir = None
     try:
         # Create temporary directory for downloading CIF files
@@ -509,18 +596,14 @@ def retrieve_afdb_chunk_to_h5(
         # Download CIF files from AFDB one by one for better error handling
         logger.debug(f"Downloading {len(chunk_ids)} AFDB structures to {temp_dir}")
         successful_downloads = []
-        failed_downloads = []
+        failed_downloads = list(skipped_ids)
         
         for uniprot_id in chunk_ids:
-            try:
-                biotite.database.afdb.fetch(ids=[uniprot_id], format='cif', target_path=str(temp_dir))
-                successful_downloads.append(uniprot_id)
-                logger.debug(f"Successfully downloaded AFDB structure for ID {uniprot_id}")
-            except Exception as e:
-                logger.error(f"Failed to download AFDB structure for ID {uniprot_id}: {e}")
-                failed_downloads.append(uniprot_id)
-                # Continue to the next ID
-                continue
+            downloaded_id, error = fetch_one_afdb(uniprot_id, temp_dir)
+            if error is None:
+                successful_downloads.append(downloaded_id)
+            else:
+                failed_downloads.append(downloaded_id)
         
         if not successful_downloads:
             logger.warning(f"No AFDB structures were successfully downloaded for chunk (all {len(chunk_ids)} IDs failed)")

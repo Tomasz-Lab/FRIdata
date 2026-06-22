@@ -65,7 +65,11 @@ class Embedding:
         # Use the embedder type from the dataset, default to ESM2 if not specified
         if self.structures_dataset.embedder_type is None:
             self.structures_dataset.embedder_type = EmbedderType.ESM2_T33_650M
-        
+        if self.structures_dataset.embedding_size is None:
+            self.structures_dataset.embedding_size = (
+                self.structures_dataset.embedder_type.embedding_size
+            )
+
         # Get the embedder instance and run embedding
         logger.info(f"Loading embedding model: {self.structures_dataset.embedder_type.value}")
         embedder = self.structures_dataset.embedder_type.create_embedder()
@@ -74,6 +78,8 @@ class Embedding:
         present_embeddings.update(index_of_new_embeddings)
 
         create_index(self.embeddings_index_path, present_embeddings, self.structures_dataset.config.data_path)
+
+        self.structures_dataset.save_dataset_metadata()
 
         end = time.time()
         logger.info(f"Total time: {format_time(end - start)}\n")
