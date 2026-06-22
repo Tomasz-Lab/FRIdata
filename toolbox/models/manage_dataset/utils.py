@@ -317,46 +317,46 @@ def retrieve_pdb_chunk_to_h5(
     pdb_ids: Iterable[str],
     is_binary: bool,
     workers: List[str] = None,
-) -> Tuple[List[str], str, Dict[str, str], Dict[str, float]]:
+) -> Tuple[List[str], str, Dict[str, str]]:
     with worker_client() as client:
-        start_time = time.perf_counter()
-        map_read = retrieve_binary_cif if is_binary else retrieve_cif
-        map_convert = binary_cif_to_pdbs if is_binary else cif_to_pdbs
-
-        read_futures = client.map(map_read, pdb_ids, workers=workers)
-        converted_pdb_futures = client.map(map_convert, read_futures, workers=workers)
+        pdb_futures = client.map(
+            retrieve_binary_cif if is_binary else retrieve_cif, pdb_ids, workers=workers
+        )
+        converted_pdb_futures = client.map(
+            binary_cif_to_pdbs if is_binary else cif_to_pdbs,
+            pdb_futures,
+            workers=workers,
+        )
         download_start_time = time.time()
-        aggregated_future = client.submit(
+        aggregated = client.submit(
             aggregate_results,
             converted_pdb_futures,
             download_start_time,
             workers=workers,
         )
-        aggregated = client.gather(aggregated_future)
-        pipeline_time = time.perf_counter() - start_time
 
-        h5_start = time.perf_counter()
-        h5_file_path = client.submit(
+        h5_task = client.submit(
             compress_and_save_h5,
             path_for_batch,
             aggregated,
             pure=False,
             workers=workers,
-        ).result()
-        downloaded_map = downloaded_structures_map_rcsb(aggregated, h5_file_path)
-        h5_time = time.perf_counter() - h5_start
-
-        pdb_ids_out = aggregated[0]
-        logger.info(
-            f"Total processing time {path_for_batch.stem}: {format_time(pipeline_time + h5_time)} "
-            f"(extract {format_time(pipeline_time)}, h5 {format_time(h5_time)})"
+        )
+        get_ids_task = client.submit(
+            lambda results: results[0], aggregated, workers=workers
+        )
+        downloaded_map_task = client.submit(
+            downloaded_structures_map_rcsb,
+            aggregated,
+            h5_task,
+            workers=workers,
         )
 
-        worker_timings = {
-            "protein_extraction_pipeline": pipeline_time,
-            "h5_save": h5_time,
-        }
-        return pdb_ids_out, h5_file_path or "", downloaded_map or {}, worker_timings
+        pdb_ids_out, h5_file_path, downloaded_map = client.gather(
+            [get_ids_task, h5_task, downloaded_map_task]
+        )
+
+        return pdb_ids_out, h5_file_path or "", downloaded_map or {}
 
 
 def fetch_one_afdb(

@@ -2,7 +2,6 @@ import hashlib
 import os
 import pickle
 import time
-from contextlib import nullcontext
 from typing import Iterable, List, NamedTuple, Optional, Tuple, Dict, Union
 import zipfile
 import tarfile
@@ -13,7 +12,6 @@ from toolbox.models.manage_dataset.index.handle_index import add_new_files_to_in
 from toolbox.models.utils.create_client import total_workers
 
 from toolbox.models.manage_dataset.compute_batches import ComputeBatches
-from toolbox.models.manage_dataset.create_dataset_timing import get_active_timings
 from toolbox.models.manage_dataset.utils import (
     compress_and_save_h5,
     mkdir_for_batches,
@@ -383,12 +381,7 @@ def save_extracted_files(
     pdb_repo_path = structures_dataset.structures_path()
 
     extracted_path = Path(extracted_path)
-    timings = get_active_timings()
-    if timings is not None:
-        with timings.measure("build_stem_to_paths"):
-            stem_to_paths = build_stem_to_paths(extracted_path)
-    else:
-        stem_to_paths = build_stem_to_paths(extracted_path)
+    stem_to_paths = build_stem_to_paths(extracted_path)
     picked_by_stem = {
         stem: _pick_path_prefer_cif(paths) for stem, paths in stem_to_paths.items()
     }
@@ -411,21 +404,19 @@ def save_extracted_files(
         seen_resolved: set[str] = set()
         missing_files = []
 
-        resolve_ctx = timings.measure("resolve_requested_ids") if timings else nullcontext()
-        with resolve_ctx:
-            resolution_index = build_resolution_index(stem_to_paths, picked_by_stem)
-            for raw_id in ids:
-                rid = raw_id.strip()
-                resolved_paths = resolve_id_with_index(rid, resolution_index)
-                if not resolved_paths:
-                    missing_files.append(raw_id)
-                    continue
-                chosen = pick_single_path_for_canonical_id(resolved_paths)
-                key = str(chosen.resolve())
-                if key not in seen_resolved:
-                    seen_resolved.add(key)
-                    wanted_items.append((key, rid))
-                    canonical_base_to_source_name[rid] = chosen.name
+        resolution_index = build_resolution_index(stem_to_paths, picked_by_stem)
+        for raw_id in ids:
+            rid = raw_id.strip()
+            resolved_paths = resolve_id_with_index(rid, resolution_index)
+            if not resolved_paths:
+                missing_files.append(raw_id)
+                continue
+            chosen = pick_single_path_for_canonical_id(resolved_paths)
+            key = str(chosen.resolve())
+            if key not in seen_resolved:
+                seen_resolved.add(key)
+                wanted_items.append((key, rid))
+                canonical_base_to_source_name[rid] = chosen.name
 
         logger.info(
             f"Resolved {len(wanted_items)} file path(s), {len(missing_files)} missing "
@@ -433,11 +424,7 @@ def save_extracted_files(
         )
         chunks = list(structures_dataset.chunk(wanted_items))
 
-    if timings is not None:
-        with timings.measure("mkdir_for_batches"):
-            mkdir_for_batches(pdb_repo_path, len(chunks))
-    else:
-        mkdir_for_batches(pdb_repo_path, len(chunks))
+    mkdir_for_batches(pdb_repo_path, len(chunks))
 
     new_files_index = {}
 
@@ -447,12 +434,7 @@ def save_extracted_files(
         )
 
     def collect(result):
-        if len(result) == 3:
-            downloaded_pdbs, file_path, worker_timings = result
-            if timings is not None:
-                timings.merge_worker_timings(worker_timings)
-        else:
-            downloaded_pdbs, file_path = result
+        downloaded_pdbs, file_path = result
         new_files_index.update({k: file_path for k in downloaded_pdbs})
 
     compute_batches = ComputeBatches(
@@ -493,30 +475,16 @@ def save_extracted_files(
             input_structures_index[id_with_chain] = file_path.name
 
     try:
-        if timings is not None:
-            with timings.measure("update_dataset_index"):
-                add_new_files_to_index(
-                    structures_dataset.dataset_index_file_path(),
-                    new_files_index,
-                    structures_dataset.config.data_path,
-                )
-            with timings.measure("update_input_structures_index"):
-                create_index(
-                    structures_dataset.input_structures_index_path(),
-                    input_structures_index,
-                    structures_dataset.config.data_path,
-                )
-        else:
-            add_new_files_to_index(
-                structures_dataset.dataset_index_file_path(),
-                new_files_index,
-                structures_dataset.config.data_path,
-            )
-            create_index(
-                structures_dataset.input_structures_index_path(),
-                input_structures_index,
-                structures_dataset.config.data_path,
-            )
+        add_new_files_to_index(
+            structures_dataset.dataset_index_file_path(),
+            new_files_index,
+            structures_dataset.config.data_path,
+        )
+        create_index(
+            structures_dataset.input_structures_index_path(),
+            input_structures_index,
+            structures_dataset.config.data_path,
+        )
     except Exception as e:
         logger.error(f"Failed to update index: {e}")
     
@@ -527,44 +495,38 @@ def retrieve_protein_file_to_h5(
     path_for_batch: Path,
     pdb_ids: Iterable[Union[str, Tuple[str, str]]],
     workers: List[str] = None,
-) -> Tuple[List[str], str, Dict[str, float]]:
+) -> Tuple[List[str], str]:
     with worker_client() as client:
-        start_time = time.perf_counter()
+        start_time = time.time()
 
-        read_futures = client.map(retrieve_single_file, pdb_ids, workers=workers)
-        converted_pdb_futures = client.map(file_to_pdb, read_futures, workers=workers)
+        pdb_futures = client.map(retrieve_single_file, pdb_ids, workers=workers)
+        converted_pdb_futures = client.map(file_to_pdb, pdb_futures, workers=workers)
         download_start_time = time.time()
-        aggregated_future = client.submit(
+        aggregated = client.submit(
             aggregate_results,
             converted_pdb_futures,
             download_start_time,
             workers=workers,
         )
-        aggregated = client.gather(aggregated_future)
-        pipeline_time = time.perf_counter() - start_time
 
-        h5_start = time.perf_counter()
-        h5_file_path = client.submit(
+        h5_task = client.submit(
             compress_and_save_h5,
             path_for_batch,
             aggregated,
             pure=False,
             workers=workers,
-        ).result()
-        pdb_ids_out = aggregated[0]
-        h5_time = time.perf_counter() - h5_start
-
-        total_time = pipeline_time + h5_time
-        logger.info(
-            f"Total processing time {path_for_batch.stem}: {format_time(total_time)} "
-            f"(extract {format_time(pipeline_time)}, h5 {format_time(h5_time)})"
+        )
+        get_ids_task = client.submit(
+            lambda results: results[0], aggregated, workers=workers
         )
 
-        worker_timings = {
-            "protein_extraction_pipeline": pipeline_time,
-            "h5_save": h5_time,
-        }
-        return pdb_ids_out, h5_file_path, worker_timings
+        pdb_ids_out, h5_file_path = client.gather([get_ids_task, h5_task])
+
+        end_time = time.time()
+        total_time = end_time - start_time
+        logger.info(f"Total processing time {path_for_batch.stem}: {format_time(total_time)}")
+
+        return pdb_ids_out, h5_file_path
 
 
 def retrieve_single_file(

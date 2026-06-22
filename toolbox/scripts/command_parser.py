@@ -105,12 +105,8 @@ class CommandParser:
         )
 
     def create_dataset(self):
-        from toolbox.models.manage_dataset.create_dataset_timing import (
-            install_create_dataset_timing,
-        )
         from toolbox.models.manage_dataset.utils import format_time
 
-        install_create_dataset_timing()
         start = time.time()
 
         dataset = self._build_structures_dataset_from_args()

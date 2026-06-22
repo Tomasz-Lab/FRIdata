@@ -3,9 +3,9 @@ import pathlib
 import sys
 
 
-from toolbox.models.manage_dataset.create_dataset_timing import install_create_dataset_timing
+from toolbox.models.manage_dataset.utils import install_afdb_download_prefilter
 
-install_create_dataset_timing()
+install_afdb_download_prefilter()
 
 from toolbox.models.manage_dataset.database_type import DatabaseType
 from toolbox.models.manage_dataset.collection_type import CollectionType
