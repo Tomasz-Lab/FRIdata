@@ -33,3 +33,5 @@ build
 .claude/skills/gitnexus/*
 
 .gitnexus
+
+reports/
