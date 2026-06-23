@@ -2,6 +2,7 @@
 
 import zlib
 from pathlib import Path
+from unittest.mock import patch
 
 import h5py
 import numpy as np
@@ -43,7 +44,7 @@ def write_pdbs_shard(path: Path, codes_to_text: dict[str, str]) -> None:
     "mode,file_writer,key_line,shape_line",
     [
         (
-            "distogram",
+            "distograms",
             lambda p: write_distograms_batch(
                 p,
                 {
@@ -67,7 +68,7 @@ def write_pdbs_shard(path: Path, codes_to_text: dict[str, str]) -> None:
             "shape: (1, 4)",
         ),
         (
-            "embedding",
+            "embeddings",
             lambda p: write_embeddings_batch(
                 p, {"seq_one": np.zeros((5, 3), dtype=np.float32)}
             ),
@@ -94,6 +95,49 @@ def test_render_numeric_modes_include_section_shape_preview(
     assert "preview:" in text
 
 
+@pytest.mark.parametrize(
+    "mode,file_writer,expected_value",
+    [
+        (
+            "distograms",
+            lambda p: write_distograms_batch(
+                p, {"protA": np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)}
+            ),
+            "3.",
+        ),
+        (
+            "coordinates",
+            lambda p: write_coordinates_batch(
+                p, {"p1": np.array([[0.0, 1.0, 2.0, 3.0]], dtype=np.float32)}
+            ),
+            "2.",
+        ),
+        (
+            "embeddings",
+            lambda p: write_embeddings_batch(
+                p, {"seq_one": np.array([[1.0, 2.0, 3.0]], dtype=np.float32)}
+            ),
+            "2.",
+        ),
+    ],
+)
+def test_render_numeric_modes_full_dump_with_name(
+    tmp_path: Path,
+    mode: str,
+    file_writer,
+    expected_value: str,
+) -> None:
+    from toolbox.utlis.inspect_h5 import render_inspect_h5_content
+
+    h5_path = tmp_path / "batch.h5"
+    file_writer(h5_path)
+    key = "protA" if mode == "distograms" else ("p1" if mode == "coordinates" else "seq_one")
+    text = render_inspect_h5_content(h5_path, mode, names=(key,))
+    assert text is not None
+    assert "preview:" not in text
+    assert expected_value in text
+
+
 def test_render_distogram_ordered_name_filter(tmp_path: Path) -> None:
     from toolbox.utlis.inspect_h5 import render_inspect_h5_content
 
@@ -105,7 +149,9 @@ def test_render_distogram_ordered_name_filter(tmp_path: Path) -> None:
             "a_first": np.ones((2, 2), dtype=np.float32),
         },
     )
-    text = render_inspect_h5_content(h5_path, "distogram", names=("z_last", "a_first"))
+    text = render_inspect_h5_content(
+        h5_path, "distograms", names=("z_last", "a_first")
+    )
     assert text is not None
     assert text.index("=== z_last ===") < text.index("=== a_first ===")
 
@@ -120,7 +166,7 @@ def test_render_large_distogram_skips_high_cost_stats(tmp_path: Path) -> None:
     write_distograms_batch(path, {"bigprot": rng.random((n, n)).astype(np.float32)})
     assert n * n > ih.FULL_STATS_MAX_ELEMENTS
 
-    text = ih.render_inspect_h5_content(path, "distogram", None)
+    text = ih.render_inspect_h5_content(path, "distograms", None)
     assert text is not None
     assert "=== bigprot ===" in text
     assert "preview:" in text
@@ -135,7 +181,7 @@ def test_render_missing_name_warns_and_skips(
     path = tmp_path / "m.h5"
     write_distograms_batch(path, {"have": np.eye(2, dtype=np.float32)})
     with caplog.at_level("WARNING"):
-        text = render_inspect_h5_content(path, "distogram", names=("ghost", "have"))
+        text = render_inspect_h5_content(path, "distograms", names=("ghost", "have"))
     assert text is not None
     assert "=== have ===" in text
     assert "ghost" in caplog.text
@@ -153,23 +199,23 @@ def test_render_skips_bad_group_but_keeps_good(
         hf.create_group("bad_empty")
 
     with caplog.at_level("WARNING"):
-        text = render_inspect_h5_content(p, "distogram", None)
+        text = render_inspect_h5_content(p, "distograms", None)
     assert text is not None
     assert "=== good ===" in text
     assert "bad_empty" in caplog.text
 
 
-def test_render_content_pdbs_shard(tmp_path: Path) -> None:
+def test_render_structures_pdbs_shard(tmp_path: Path) -> None:
     from toolbox.utlis.inspect_h5 import render_inspect_h5_content
 
     p = tmp_path / "pdbs.h5"
     write_pdbs_shard(p, {"CODE1": "HEADER\nLINE2", "CODE2": "OTHER"})
-    text = render_inspect_h5_content(p, "content", None)
+    text = render_inspect_h5_content(p, "structures", None)
     assert text is not None
     assert "=== CODE1 ===" in text
     assert "HEADER" in text
 
-    sub = render_inspect_h5_content(p, "content", names=("CODE2",))
+    sub = render_inspect_h5_content(p, "structures", names=("CODE2",))
     assert sub is not None
     assert "OTHER" in sub
 
@@ -178,7 +224,40 @@ def test_render_missing_file_returns_none(tmp_path: Path) -> None:
     from toolbox.utlis.inspect_h5 import render_inspect_h5_content
 
     missing = tmp_path / "does_not_exist.h5"
-    assert render_inspect_h5_content(missing, "structure", None) is None
+    assert render_inspect_h5_content(missing, "preview", None) is None
+
+
+def test_inspect_h5_save_to_temp(tmp_path: Path) -> None:
+    from toolbox.utlis.inspect_h5 import inspect_h5
+
+    h5_path = tmp_path / "batch.h5"
+    write_distograms_batch(h5_path, {"protA": np.eye(2, dtype=np.float32)})
+
+    with patch("toolbox.utlis.inspect_h5.subprocess.run") as mock_run:
+        out = inspect_h5(h5_path, mode="distograms", names=("protA",), save="")
+
+    mock_run.assert_not_called()
+    assert out is not None
+    assert out.exists()
+    assert "=== protA ===" in out.read_text(encoding="utf-8")
+
+
+def test_inspect_h5_save_to_filepath(tmp_path: Path) -> None:
+    from toolbox.utlis.inspect_h5 import inspect_h5
+
+    h5_path = tmp_path / "batch.h5"
+    out_path = tmp_path / "out" / "dump.txt"
+    write_distograms_batch(h5_path, {"protA": np.eye(2, dtype=np.float32)})
+
+    with patch("toolbox.utlis.inspect_h5.subprocess.run") as mock_run:
+        out = inspect_h5(
+            h5_path, mode="distograms", names=("protA",), save=str(out_path)
+        )
+
+    mock_run.assert_not_called()
+    assert out == out_path
+    assert out.exists()
+    assert "=== protA ===" in out.read_text(encoding="utf-8")
 
 
 def test_cli_inspect_accepts_numeric_modes_and_name(tmp_path: Path) -> None:
@@ -186,24 +265,44 @@ def test_cli_inspect_accepts_numeric_modes_and_name(tmp_path: Path) -> None:
     h5_path = tmp_path / "any.h5"
     h5_path.touch()
     args = parser.parse_args(
-        ["inspect_h5", "--mode", "distogram", "--name", "a,b", str(h5_path)]
+        ["inspect_h5", "--mode", "distograms", "--name", "a,b", str(h5_path)]
     )
     validate_inspect_h5_cli_args(args, parser)
     assert args.command == "inspect_h5"
-    assert args.mode == "distogram"
+    assert args.mode == "distograms"
     assert args.pdb_names == ["a", "b"]
 
-    args2 = parser.parse_args(["inspect_h5", "--mode", "embedding", str(h5_path)])
+    args2 = parser.parse_args(["inspect_h5", "--mode", "embeddings", str(h5_path)])
     validate_inspect_h5_cli_args(args2, parser)
-    assert args2.mode == "embedding"
+    assert args2.mode == "embeddings"
 
 
-def test_cli_name_rejected_for_structure_mode(tmp_path: Path) -> None:
+def test_cli_save_flag_parsed(tmp_path: Path) -> None:
+    parser = create_parser()
+    h5_path = tmp_path / "batch.h5"
+    h5_path.touch()
+    out_path = tmp_path / "out.txt"
+
+    args = parser.parse_args(
+        ["inspect_h5", str(h5_path), "--save", str(out_path)]
+    )
+    assert args.save == str(out_path)
+
+
+def test_cli_save_without_filepath(tmp_path: Path) -> None:
+    parser = create_parser()
+    h5_path = tmp_path / "any.h5"
+    h5_path.touch()
+    args = parser.parse_args(["inspect_h5", str(h5_path), "--save"])
+    assert args.save == ""
+
+
+def test_cli_name_rejected_for_preview_mode(tmp_path: Path) -> None:
     parser = create_parser()
     h5_path = tmp_path / "x.h5"
     h5_path.touch()
     args = parser.parse_args(
-        ["inspect_h5", "--mode", "structure", "--name", "only", str(h5_path)]
+        ["inspect_h5", "--mode", "preview", "--name", "only", str(h5_path)]
     )
     with pytest.raises(SystemExit):
         validate_inspect_h5_cli_args(args, parser)

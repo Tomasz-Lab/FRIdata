@@ -191,11 +191,14 @@ class CommandParser:
     def inspect_h5(self):
         from toolbox.utlis.inspect_h5 import inspect_h5
 
-        inspect_h5(
+        out = inspect_h5(
             Path(self.args.file),
-            mode=getattr(self.args, "mode", "structure"),
+            mode=getattr(self.args, "mode", "preview"),
             names=getattr(self.args, "pdb_names", None),
+            save=getattr(self.args, "save", None),
         )
+        if out is not None:
+            print(out)
 
     def inspect_idx(self):
         from toolbox.utlis.inspect_idx import inspect_idx

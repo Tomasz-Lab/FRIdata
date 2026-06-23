@@ -65,6 +65,22 @@ def _summarize_numeric_dataset(ds: h5py.Dataset, title: str) -> list[str]:
     return lines
 
 
+def _dump_full_numeric_dataset(ds: h5py.Dataset, title: str) -> list[str]:
+    lines = [f"=== {title} ===", f"shape: {tuple(ds.shape)}, dtype: {ds.dtype}"]
+    if ds.compression is not None:
+        lines.append(f"compression: {ds.compression}")
+
+    size = getattr(ds, "size", None)
+    n_elem = int(size) if size is not None else int(np.prod(ds.shape))
+
+    if n_elem == 0:
+        lines.append("(empty)")
+        return lines
+
+    lines.append(np.array2string(np.asarray(ds[:]), precision=6, max_line_width=120))
+    return lines
+
+
 def render_inspect_h5_content(
     path: Path,
     mode: str,
@@ -74,9 +90,11 @@ def render_inspect_h5_content(
 
     Args:
         path: Path to HDF5 file.
-        mode: ``structure``, ``keys``, ``content``, ``distogram``, ``coordinates``, ``embedding``.
-        names: Keys to include for ``content`` / ``distogram`` / ``coordinates`` / ``embedding``;
-               order follows this sequence when supplied.
+        mode: ``preview``, ``keys``, ``structures``, ``distograms``, ``coordinates``,
+            ``embeddings``.
+        names: Keys to include for ``structures`` / ``distograms`` / ``coordinates`` /
+            ``embeddings``; order follows this sequence when supplied. For numeric
+            modes, supplying names emits a full array dump instead of a preview.
 
     Returns:
         Summary string or ``None`` if the path is missing or PDB read failed.
@@ -87,7 +105,7 @@ def render_inspect_h5_content(
 
     lines: list[str] = []
 
-    if mode == "structure":
+    if mode == "preview":
         with h5py.File(path, "r") as hf:
 
             def walk(
@@ -119,8 +137,9 @@ def render_inspect_h5_content(
             return "\n".join(sorted(keys))
 
     key_order = list(names) if names else None
+    full_dump = names is not None
 
-    if mode == "content":
+    if mode == "structures":
         pdbs = read_pdbs_from_h5(str(path), list(names) if names else None)
         if pdbs is None:
             logger.error("Failed to read h5 file")
@@ -145,6 +164,10 @@ def render_inspect_h5_content(
                 lines.append("")
         return "\n".join(lines)
 
+    numeric_formatter = (
+        _dump_full_numeric_dataset if full_dump else _summarize_numeric_dataset
+    )
+
     with h5py.File(path, "r") as hf:
         if key_order is None:
             keys_to_walk = sorted(hf.keys(), key=str)
@@ -157,7 +180,7 @@ def render_inspect_h5_content(
                     ", ".join(sorted(missing)),
                 )
 
-        if mode == "distogram":
+        if mode == "distograms":
             for k in keys_to_walk:
                 if k not in hf:
                     continue
@@ -168,7 +191,7 @@ def render_inspect_h5_content(
                         k,
                     )
                     continue
-                lines.extend(_summarize_numeric_dataset(obj["distogram"], k))
+                lines.extend(numeric_formatter(obj["distogram"], k))
                 lines.append("")
         elif mode == "coordinates":
             for k in keys_to_walk:
@@ -181,9 +204,9 @@ def render_inspect_h5_content(
                         k,
                     )
                     continue
-                lines.extend(_summarize_numeric_dataset(obj["coords"], k))
+                lines.extend(numeric_formatter(obj["coords"], k))
                 lines.append("")
-        elif mode == "embedding":
+        elif mode == "embeddings":
             for k in keys_to_walk:
                 if k not in hf:
                     continue
@@ -194,7 +217,7 @@ def render_inspect_h5_content(
                         k,
                     )
                     continue
-                lines.extend(_summarize_numeric_dataset(obj, k))
+                lines.extend(numeric_formatter(obj, k))
                 lines.append("")
         else:
             logger.error(f"Unsupported inspect mode: {mode}")
@@ -204,6 +227,22 @@ def render_inspect_h5_content(
         lines.pop()
 
     return "\n".join(lines)
+
+
+def _write_content(content: str, dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(content, encoding="utf-8")
+    return dest
+
+
+def _save_content(content: str, save: str) -> Path:
+    if save == "":
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        ) as tmp:
+            tmp.write(content)
+            return Path(tmp.name)
+    return _write_content(content, Path(save))
 
 
 def _inspect_in_vi(content: str) -> None:
@@ -221,19 +260,28 @@ def _inspect_in_vi(content: str) -> None:
 
 def inspect_h5(
     path: Path,
-    mode: str = "structure",
+    mode: str = "preview",
     names: Optional[Sequence[str]] = None,
-) -> None:
-    """Read h5 file and display in vi editor.
+    save: Optional[str] = None,
+) -> Optional[Path]:
+    """Read h5 file and display in vi editor or save to a file.
 
     Args:
         path: Path to the HDF5 file.
-        mode: ``structure`` (tree), ``keys``, ``content`` (PDB shard),
-            ``distogram``, ``coordinates``, or ``embedding`` (numeric summaries).
-        names: For ``content`` / ``distogram`` / ``coordinates`` / ``embedding``,
+        mode: ``preview`` (tree), ``keys``, ``structures`` (PDB shard),
+            ``distograms``, ``coordinates``, or ``embeddings``.
+        names: For ``structures`` / ``distograms`` / ``coordinates`` / ``embeddings``,
             optional exact keys; output order follows this list when given.
+        save: When set, write output to a file instead of opening vi.
+            Use ``""`` for a persistent temp file; otherwise a filesystem path.
+
+    Returns:
+        Path to the saved file when ``save`` is set, else ``None``.
     """
     content = render_inspect_h5_content(path, mode, names)
     if content is None:
-        return
+        return None
+    if save is not None:
+        return _save_content(content, save)
     _inspect_in_vi(content)
+    return None

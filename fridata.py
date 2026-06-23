@@ -158,13 +158,13 @@ def validate_inspect_h5_cli_args(args: argparse.Namespace, parser: argparse.Argu
     if getattr(args, "command", None) != "inspect_h5":
         return
     if getattr(args, "pdb_names", None) and getattr(args, "mode", None) not in (
-        "content",
-        "distogram",
+        "structures",
+        "distograms",
         "coordinates",
-        "embedding",
+        "embeddings",
     ):
         parser.error(
-            "--name is only valid with --mode content|distogram|coordinates|embedding"
+            "--name is only valid with --mode structures|distograms|coordinates|embeddings"
         )
 
 
@@ -280,17 +280,17 @@ def create_parser():
     inspect_h5_parser.add_argument(
         "--mode",
         choices=[
-            "structure",
-            "content",
+            "preview",
+            "structures",
             "keys",
-            "distogram",
+            "distograms",
             "coordinates",
-            "embedding",
+            "embeddings",
         ],
-        default="structure",
+        default="preview",
         help=(
-            "structure: tree; keys: id list; content: PDB text (files group); "
-            "distogram|coordinates|embedding: numeric preview + stats when small"
+            "preview: H5 tree; keys: id list; structures: full PDB text (files group); "
+            "distograms|coordinates|embeddings: numeric preview (or full dump with --name)"
         ),
     )
     inspect_h5_parser.add_argument(
@@ -300,9 +300,21 @@ def create_parser():
         default=None,
         metavar="KEYS",
         help=(
-            "Comma-separated keys (distogram/coordinates/embedding batches or PDB shards). "
-            "Only with --mode content|distogram|coordinates|embedding. "
+            "Comma-separated protein keys. Only with --mode "
+            "structures|distograms|coordinates|embeddings. "
+            "For numeric modes, emits a full array dump. "
             "Use inspect_h5 --mode keys to list keys."
+        ),
+    )
+    inspect_h5_parser.add_argument(
+        "--save",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="FILEPATH",
+        help=(
+            "Write output to a file instead of vi. "
+            "Omit FILEPATH to write a persistent temp file and print its path."
         ),
     )
 
