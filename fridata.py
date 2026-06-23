@@ -196,7 +196,7 @@ def create_parser():
 
 
     extract_sequence_and_coordinates_parser = subparsers.add_parser(
-        "generate_sequence", help="Generate sequences for "
+        "generate_sequence", help="Generate sequences for..."
     )
     add_common_arguments(extract_sequence_and_coordinates_parser)
     extract_sequence_and_coordinates_parser.add_argument(
@@ -211,17 +211,17 @@ def create_parser():
     )
 
     generate_distograms_parser = subparsers.add_parser(
-        "generate_distograms", help="Generate distograms for "
+        "generate_distograms", help="Generate distograms for..."
     )
     add_common_arguments(generate_distograms_parser)
 
     read_distograms_parser = subparsers.add_parser(
-        "read_distograms", help="Read distograms for "
+        "read_distograms", help="Read distograms for..."
     )
     add_common_arguments(read_distograms_parser)
 
     read_pdbs_parser = subparsers.add_parser(
-        "read_pdbs", help="Read pdbs for "
+        "read_pdbs", help="Read pdbs for..."
     )
     read_pdbs_parser.add_argument(
         "--print", action="store_true", help="Print PDB files to the terminal"
@@ -239,7 +239,7 @@ def create_parser():
     add_common_arguments(read_pdbs_parser)
 
     verify_chains_parser = subparsers.add_parser(
-        "verify_chains", help="Verify chains for "
+        "verify_chains", help="Verify chains for..."
     )
     add_common_arguments(verify_chains_parser)
 
