@@ -123,6 +123,7 @@ class CommandParser:
 
         end = time.time()
         logger.info(f"Total time: {format_time(end - start)}")
+        logger.info("Dataset creation finished successfully: %s", dataset_name)
         return dataset
 
     def generate_embeddings(self):
