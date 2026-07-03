@@ -34,7 +34,7 @@ conda install -n base mamba
 4. Create a mamba environment
 
 ```
-mamba create -f toolbox_env_conda.yml
+mamba create -f fridata_env_conda.yml
 ```
 
 5. Activate mamba shell hook

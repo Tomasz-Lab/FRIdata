@@ -18,7 +18,7 @@ jobs:
         id: cache-key
         run: |
           # Create a hash from the environment file and PyTorch CPU install string
-          ENV_HASH=$(sha256sum toolbox_env_conda.yml | cut -d' ' -f1)
+          ENV_HASH=$(sha256sum fridata_env_conda.yml | cut -d' ' -f1)
           PYTORCH_SPEC="pip-torch-torchvision-cpu-whl"
           CACHE_KEY="micromamba-${{ runner.os }}-${ENV_HASH}-${PYTORCH_SPEC}"
           echo "key=${CACHE_KEY}" >> $GITHUB_OUTPUT
@@ -36,7 +36,7 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         uses: mamba-org/setup-micromamba@v2
         with:
-          environment-file: toolbox_env_conda.yml
+          environment-file: fridata_env_conda.yml
           environment-name: tbe
           cache-environment: false
           cache-downloads: false
