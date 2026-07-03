@@ -26,8 +26,6 @@ dependencies:
   - biopython
   - bokeh>=2.4.2,<3.0.0
   - pdbfixer
-  # PyTorch and ESM installed separately via install.sh (GPU or CPU variant)
-  # ESM requires PyTorch to be installed first
   - mamba
   - transformers
   - tqdm
