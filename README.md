@@ -47,7 +47,7 @@ eval "$(mamba shell hook --shell <replace with shell type>)"
 6. Activate the mamba environment
 
 ```
-mamba activate tbe
+mamba activate fridata_env
 ```
 
 ## Running tests

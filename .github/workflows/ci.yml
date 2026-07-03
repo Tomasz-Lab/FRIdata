@@ -37,7 +37,7 @@ jobs:
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: fridata_env_conda.yml
-          environment-name: tbe
+          environment-name: fridata_env
           cache-environment: false
           cache-downloads: false
           micromamba-binary-path: ~/micromamba-bin/micromamba
@@ -59,9 +59,9 @@ jobs:
           # CPU wheels from PyTorch are the usual CI approach. Install torchvision from the
           # same index as torch so C++/dispatch ops (e.g. torchvision::nms) match conda-forge
           # transformers alone pulls torchvision that can mismatch a pip-only torch build.
-          ~/micromamba-bin/micromamba run -n tbe python -m pip install --upgrade pip
-          ~/micromamba-bin/micromamba run -n tbe python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-          ~/micromamba-bin/micromamba run -n tbe python -m pip install esm
+          ~/micromamba-bin/micromamba run -n fridata_env python -m pip install --upgrade pip
+          ~/micromamba-bin/micromamba run -n fridata_env python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          ~/micromamba-bin/micromamba run -n fridata_env python -m pip install esm
 
       - name: Save micromamba environment cache
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -74,4 +74,4 @@ jobs:
 
       - name: Run tests
         run: |
-          ~/micromamba-bin/micromamba run -n tbe pytest ./tests
+          ~/micromamba-bin/micromamba run -n fridata_env pytest ./tests
