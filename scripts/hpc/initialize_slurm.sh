@@ -57,13 +57,19 @@ fi
 
 conda config --add pkgs_dirs "$CONDA_DIR"
 
-# Create environment from base YAML (without PyTorch)
-conda env create --prefix $CONDA_ENV_PATH --file "$DEEPFRI_PATH/FRIdata/fridata_env_conda.yml"
+# Create environment from base YAML (without PyTorch or pip-only deps)
+ENV_WORKDIR="$(mktemp -d)"
+trap 'rm -rf "$ENV_WORKDIR"' EXIT
+cp "$DEEPFRI_PATH/FRIdata/fridata_env_conda.yml" "$ENV_WORKDIR/fridata_env_conda.yml"
+conda env create --prefix $CONDA_ENV_PATH --file "$ENV_WORKDIR/fridata_env_conda.yml"
 
 conda config --set auto_activate_base false
 
 eval "$(conda shell.bash hook)"
 conda activate $CONDA_ENV_PATH
+
+echo "Installing pip requirements..."
+pip install -r "$DEEPFRI_PATH/FRIdata/requirements-fridata.txt"
 
 # Install PyTorch based on mode
 if [ "$CPU_ONLY" = true ]; then

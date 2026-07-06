@@ -17,8 +17,8 @@ jobs:
       - name: Generate cache key
         id: cache-key
         run: |
-          # Create a hash from the environment file and PyTorch CPU install string
-          ENV_HASH=$(sha256sum fridata_env_conda.yml | cut -d' ' -f1)
+          # Create a hash from the environment files and PyTorch CPU install string
+          ENV_HASH=$(cat fridata_env_conda.yml requirements-fridata.txt | sha256sum | cut -d' ' -f1)
           PYTORCH_SPEC="pip-torch-torchvision-cpu-whl"
           CACHE_KEY="micromamba-${{ runner.os }}-${ENV_HASH}-${PYTORCH_SPEC}"
           echo "key=${CACHE_KEY}" >> $GITHUB_OUTPUT
@@ -51,15 +51,17 @@ jobs:
           echo "$HOME/micromamba-bin" >> "$GITHUB_PATH"
           echo "MAMBA_ROOT_PREFIX=$HOME/micromamba" >> "$GITHUB_ENV"
 
-      - name: Install CPU-only PyTorch and dependencies
+      - name: Install pip requirements and CPU-only PyTorch
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: |
+          # Pip packages are installed separately so read-only checkouts and CI caches stay reliable.
+          ~/micromamba-bin/micromamba run -n fridata_env python -m pip install --upgrade pip
+          ~/micromamba-bin/micromamba run -n fridata_env python -m pip install -r requirements-fridata.txt
           # Avoid a second micromamba/libmamba solve mixing pytorch + conda-forge on an
           # already-large env (can abort with libsolv solver_addrule assertion, exit 134).
           # CPU wheels from PyTorch are the usual CI approach. Install torchvision from the
           # same index as torch so C++/dispatch ops (e.g. torchvision::nms) match conda-forge
           # transformers alone pulls torchvision that can mismatch a pip-only torch build.
-          ~/micromamba-bin/micromamba run -n fridata_env python -m pip install --upgrade pip
           ~/micromamba-bin/micromamba run -n fridata_env python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           ~/micromamba-bin/micromamba run -n fridata_env python -m pip install esm
 

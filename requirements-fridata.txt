@@ -1,0 +1,12 @@
+foldcomp
+pydantic>=2.8.2
+scipy>=1.14.0
+h5py
+matplotlib
+biotite>=0.41.2
+numpy>=1.26.4,<1.27.0
+genson
+bs4
+bio~=1.7.0
+pytest
+pytest-order

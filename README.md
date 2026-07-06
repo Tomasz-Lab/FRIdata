@@ -7,7 +7,7 @@
 [![Source](https://img.shields.io/badge/source-GitHub-303030.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/)
 [![GitHub issues](https://img.shields.io/github/issues/Tomasz-Lab/FRIdata.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/issues)
 
-## Instalation and activation
+## Installation and activation
 
 1. Download the repo
 
@@ -31,30 +31,49 @@ conda update -n base --all
 conda install -n base mamba
 ```
 
-4. Create a mamba environment
+4. Create the environment (recommended)
+
+Use the setup script to create the conda environment, install pip dependencies, and install a PyTorch build matched to your GPU driver:
 
 ```
-mamba create -f fridata_env_conda.yml
+./scripts/setup_env.sh
 ```
 
-5. Install pytorch using dedicated script.
+Use a custom environment name for a separate install:
 
 ```
-./scripts/install_pytorch.sh
+./scripts/setup_env.sh -n fridata_gpu_verify
 ```
 
-6. Activate mamba shell hook
+For CPU-only systems:
+
+```
+./scripts/setup_env.sh --cpu
+```
+
+5. Activate the environment
 
 ```
 # Choose your shell type. Could be one of these: {bash,cmd.exe,dash,fish,nu,posix,powershell,tcsh,xonsh,zsh}
 eval "$(mamba shell hook --shell <replace with shell type>)"
-```
-
-7. Activate the mamba environment
-
-```
 mamba activate fridata_env
 ```
+
+### Manual installation
+
+If you prefer to run the steps yourself:
+
+```
+mamba env create -f fridata_env_conda.yml -n fridata_env
+mamba run -n fridata_env python -m pip install -r requirements-fridata.txt
+./scripts/install_pytorch.sh
+```
+
+Pip dependencies live in `requirements-fridata.txt` instead of `fridata_env_conda.yml` so environment creation works from read-only repository checkouts.
+
+### Troubleshooting
+
+If you see `Error opening for writing ".../mambaf..."` while creating the environment, libmamba is trying to write a temporary pip requirements file next to the environment YAML. Use `./scripts/setup_env.sh` instead, or ensure the directory containing `fridata_env_conda.yml` is writable.
 
 ## Running tests
 
@@ -64,7 +83,7 @@ pytest ./tests
 
 ## Running on AFDB structures locally
 
-Requires having a directory with AFDB structures and a text file containing list of AFDB IDs with `\n` delimeter. Assuming all steps from `Instalation and activation` succeded
+Requires having a directory with AFDB structures and a text file containing list of AFDB IDs with `\n` delimeter. Assuming all steps from `Installation and activation` succeded
 
 ```
 FRIDATA_PATH="<repository path>"
@@ -93,7 +112,7 @@ For subset runs with `--input-path`, new datasets store canonical keys as `{line
 
 ## Running as a CLI tool
 
-Assuming all `Instalation and activation` steps succeeded.
+Assuming all `Installation and activation` steps succeeded.
 
 0. Go into `FRIdata` directory
 
