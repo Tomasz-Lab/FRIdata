@@ -27,11 +27,11 @@ def add_common_arguments(parser):
     parser.add_argument("--log-file", type=pathlib.Path, help="Path to log file for file logging")
 
 
-def add_dataset_parser_arguments(parser):
+def add_dataset_parser_arguments(parser, require_db_collection=True):
     parser.add_argument(
         "-d",
         "--db",
-        required=True,
+        required=require_db_collection,
         choices=db_types,
         metavar="name",
         help=f"Database Types: {' '.join(db_types)}",
@@ -39,7 +39,7 @@ def add_dataset_parser_arguments(parser):
     parser.add_argument(
         "-c",
         "--collection",
-        required=True,
+        required=require_db_collection,
         choices=collection_types,
         metavar="name",
         help=f"Collection Types: {' '.join(collection_types)}",
@@ -166,6 +166,22 @@ def validate_inspect_h5_cli_args(args: argparse.Namespace, parser: argparse.Argu
         parser.error(
             "--name is only valid with --mode structures|distograms|coordinates|embeddings"
         )
+
+
+def validate_generate_data_cli_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    """Reject invalid ``generate_data`` flag combinations after ``parse_args``."""
+    if getattr(args, "command", None) != "generate_data":
+        return
+    has_path = getattr(args, "file_path", None) is not None
+    if not has_path:
+        if not args.db or not args.collection:
+            parser.error(
+                "generate_data requires -d/--db and -c/--collection, or -p/--file-path"
+            )
+        if not args.embedder:
+            parser.error(
+                "generate_data requires -e/--embedder when creating a new dataset (no -p)"
+            )
 
 
 def create_parser():
@@ -342,8 +358,15 @@ def create_parser():
     generate_data_parser.add_argument(
         "--slurm", action="store_true", help="Use SLURM job scheduler"
     )
-    add_dataset_parser_arguments(generate_data_parser)
-    add_embedder_argument(generate_data_parser, required=True)
+    generate_data_parser.add_argument(
+        "-p",
+        "--file-path",
+        type=pathlib.Path,
+        default=None,
+        help="Existing dataset directory (with dataset.json) or path to dataset.json",
+    )
+    add_dataset_parser_arguments(generate_data_parser, require_db_collection=False)
+    add_embedder_argument(generate_data_parser, required=False)
 
     # create_dashboard command (formerly export_index_view)
     create_dashboard_parser = subparsers.add_parser(
@@ -384,6 +407,7 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
     validate_inspect_h5_cli_args(args, parser)
+    validate_generate_data_cli_args(args, parser)
 
     # Load config and raise if not found
     from toolbox.config import load_config

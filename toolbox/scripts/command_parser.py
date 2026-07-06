@@ -50,6 +50,27 @@ class CommandParser:
         )
         return self.structures_dataset
 
+    def _has_existing_dataset_path(self) -> bool:
+        return getattr(self.args, "file_path", None) is not None
+
+    def _apply_embedder_from_args(self) -> None:
+        from toolbox.models.embedding.embedder.embedder_type import EmbedderType
+
+        if hasattr(self.args, "embedder") and self.args.embedder:
+            for embedder_enum in EmbedderType:
+                if embedder_enum.value == self.args.embedder:
+                    self.structures_dataset.embedder_type = embedder_enum
+                    break
+
+    def _load_existing_dataset_for_generate_data(self, run_dataset: bool) -> None:
+        self._create_dataset_from_path_()
+        self._configure_dataset_logging()
+        self._apply_embedder_from_args()
+        if run_dataset:
+            self.structures_dataset.create_dataset()
+            dataset_name = self.structures_dataset.dataset_dir_name()
+            print(f"DATASET_NAME:{dataset_name}")
+
     def _log_command(self):
         """Log the complete command line that started the program."""
         full_command = " ".join(sys.argv)
@@ -127,19 +148,12 @@ class CommandParser:
         return dataset
 
     def generate_embeddings(self):
-        from toolbox.models.embedding.embedder.embedder_type import EmbedderType
-
         self._create_dataset_from_path_()
 
         # Configure logging to dataset log file if not already specified
         self._configure_dataset_logging()
 
-        # Set embedder type if provided
-        if hasattr(self.args, "embedder") and self.args.embedder:
-            for embedder_enum in EmbedderType:
-                if embedder_enum.value == self.args.embedder:
-                    self.structures_dataset.embedder_type = embedder_enum
-                    break
+        self._apply_embedder_from_args()
 
         self.structures_dataset.generate_embeddings()
 
@@ -268,7 +282,9 @@ class CommandParser:
         # Step 1: dataset
         run_dataset = "dataset" in selected or run_all
         try:
-            if run_dataset:
+            if self._has_existing_dataset_path():
+                self._load_existing_dataset_for_generate_data(run_dataset)
+            elif run_dataset:
                 self.create_dataset()
             else:
                 self.structures_dataset = self._build_structures_dataset_from_args()
@@ -343,6 +359,15 @@ class CommandParser:
 
         # Step 4: embeddings
         if "embeddings" in selected or run_all:
+            if self.structures_dataset.embedder_type is None:
+                self._apply_embedder_from_args()
+            if self.structures_dataset.embedder_type is None:
+                logger.error(
+                    "No embedder configured. Pass -e/--embedder or use a dataset "
+                    "with embedder_type saved in dataset.json."
+                )
+                self._finish_generate_data(total_time, is_error=True)
+                return
             try:
                 ds.generate_embeddings()
             except Exception as e:
