@@ -34,20 +34,26 @@ conda install -n base mamba
 4. Create a mamba environment
 
 ```
-mamba create -f toolbox_env_conda.yml
+mamba create -f fridata_env_conda.yml
 ```
 
-5. Activate mamba shell hook
+5. Install pytorch using dedicated script.
+
+```
+./scripts/install_pytorch.sh
+```
+
+6. Activate mamba shell hook
 
 ```
 # Choose your shell type. Could be one of these: {bash,cmd.exe,dash,fish,nu,posix,powershell,tcsh,xonsh,zsh}
 eval "$(mamba shell hook --shell <replace with shell type>)"
 ```
 
-6. Activate the mamba environment
+7. Activate the mamba environment
 
 ```
-mamba activate tbe
+mamba activate fridata_env
 ```
 
 ## Running tests

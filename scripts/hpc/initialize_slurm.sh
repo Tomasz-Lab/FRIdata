@@ -58,7 +58,7 @@ fi
 conda config --add pkgs_dirs "$CONDA_DIR"
 
 # Create environment from base YAML (without PyTorch)
-conda env create --prefix $CONDA_ENV_PATH --file "$DEEPFRI_PATH/FRIdata/toolbox_env_conda.yml"
+conda env create --prefix $CONDA_ENV_PATH --file "$DEEPFRI_PATH/FRIdata/fridata_env_conda.yml"
 
 conda config --set auto_activate_base false
 
