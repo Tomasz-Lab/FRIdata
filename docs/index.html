@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FRIdata</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      line-height: 1.6;
+    }
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+    header h1 {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: #e6edf3;
+      letter-spacing: -0.5px;
+    }
+    header p {
+      margin-top: 0.5rem;
+      color: #8b949e;
+      font-size: 1.05rem;
+    }
+    .badges {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      justify-content: center;
+    }
+    .badges img { height: 20px; }
+
+    main {
+      max-width: 860px;
+      margin: 2.5rem auto;
+      padding: 0 1.5rem;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 1.2rem 1.4rem;
+    }
+    .card h3 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #8b949e;
+      margin-bottom: 0.4rem;
+    }
+    .card p { font-size: 0.95rem; color: #c9d1d9; }
+
+    section { margin-bottom: 2.5rem; }
+    section h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #e6edf3;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 0.4rem;
+      margin-bottom: 1rem;
+    }
+    ol, ul { padding-left: 1.4rem; }
+    li { margin-bottom: 0.4rem; }
+
+    pre {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      font-size: 0.875rem;
+      color: #e6edf3;
+      margin: 0.75rem 0;
+    }
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+
+    .btn {
+      display: inline-block;
+      padding: 0.5rem 1.2rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      background: #238636;
+      color: #fff;
+      border: 1px solid #2ea043;
+    }
+    .btn:hover { background: #2ea043; text-decoration: none; }
+    .btn-outline {
+      background: transparent;
+      color: #58a6ff;
+      border-color: #30363d;
+      margin-left: 0.6rem;
+    }
+    .btn-outline:hover { background: #161b22; }
+
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      font-size: 0.85rem;
+      color: #8b949e;
+      border-top: 1px solid #30363d;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>FRIdata</h1>
+  <p>High-performance protein structure data processing with Dask</p>
+  <div class="badges">
+    <img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg?style=flat-square" alt="License">
+    <img src="https://img.shields.io/badge/python-3.10-blue.svg?style=flat-square&logo=python" alt="Python">
+    <img src="https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml/badge.svg" alt="CI">
+    <img src="https://img.shields.io/badge/impl-Dask-blue" alt="Dask">
+  </div>
+  <div style="margin-top:1.2rem;">
+    <a href="https://github.com/Tomasz-Lab/FRIdata" class="btn">View on GitHub</a>
+    <a href="https://github.com/Tomasz-Lab/FRIdata/issues" class="btn btn-outline">Issues</a>
+  </div>
+</header>
+
+<main>
+
+  <div class="cards">
+    <div class="card">
+      <h3>Purpose</h3>
+      <p>Generate sequences, coordinates, distograms, and embeddings from protein structures at scale.</p>
+    </div>
+    <div class="card">
+      <h3>Backend</h3>
+      <p>Built on <a href="https://docs.dask.org/">Dask</a> for distributed, parallel processing on CPU and GPU clusters.</p>
+    </div>
+    <div class="card">
+      <h3>HPC Ready</h3>
+      <p>Comes with SLURM scripts for PLGrid infrastructure. Supports AlphaFold DB (AFDB) structures.</p>
+    </div>
+  </div>
+
+  <section>
+    <h2>Quick Start</h2>
+    <ol>
+      <li>Clone the repository
+        <pre><code>git clone https://github.com/Tomasz-Lab/FRIdata.git
+cd FRIdata</code></pre>
+      </li>
+      <li><a href="https://www.anaconda.com/docs/getting-started/miniconda/install">Install Miniconda</a>, then install mamba:
+        <pre><code>conda config --add channels conda-forge
+conda update -n base --all
+conda install -n base mamba</code></pre>
+      </li>
+      <li>Create and activate the environment
+        <pre><code>mamba create -f toolbox_env_conda.yml
+eval "$(mamba shell hook --shell bash)"
+mamba activate tbe</code></pre>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Running on AFDB Structures</h2>
+    <pre><code>FRIDATA_PATH="&lt;repository path&gt;"
+AFDB_PATH="&lt;AFDB structures directory&gt;"
+IDS_PATH="&lt;AFDB IDs file&gt;"
+EMBEDDER_TYPE=esm2_t33_650M_UR50D
+
+# macOS: fix for OpenMP multiple runtime error
+export KMP_DUPLICATE_LIB_OK=TRUE
+
+PYTHONPATH='.' python3 -u fridata.py generate_data \
+  -t sequences,coordinates,distograms,embeddings \
+  -d AFDB -c subset --version test \
+  -i ${IDS_PATH} --input-path ${AFDB_PATH} \
+  -e ${EMBEDDER_TYPE}</code></pre>
+  </section>
+
+  <section>
+    <h2>CLI Usage</h2>
+    <pre><code>python3 -m pip install -e .
+fridata &lt;...&gt;</code></pre>
+  </section>
+
+  <section>
+    <h2>HPC (PLGrid / SLURM)</h2>
+    <p>Set required environment variables (<code>DEEPFRI_PATH</code>, <code>IDS_PATH</code>, <code>AFDB_PATH</code>, <code>DATA_PATH</code>), then:</p>
+    <pre><code># CPU nodes
+sbatch --cpus-per-task=&lt;cpus&gt; --time=&lt;HH:MM:SS&gt; --nodes=&lt;n&gt; \
+  --account=&lt;grant&gt; scripts/hpc/run_slurm.sh sequences,coordinates
+
+# GPU nodes
+sbatch --gres=gpu --time=&lt;HH:MM:SS&gt; --account=&lt;grant&gt; \
+  --partition=&lt;partition&gt; --cpus-per-task=&lt;cpus&gt; \
+  scripts/hpc/run_slurm.sh embeddings</code></pre>
+  </section>
+
+  <section>
+    <h2>Tests</h2>
+    <pre><code>pytest ./tests</code></pre>
+  </section>
+
+</main>
+
+<footer>
+  FRIdata &mdash; <a href="https://github.com/Tomasz-Lab/FRIdata/blob/main/LICENSE">BSD-3-Clause License</a>
+  &mdash; <a href="https://github.com/Tomasz-Lab">Tomasz-Lab</a>
+</footer>
+
+</body>
+</html>
