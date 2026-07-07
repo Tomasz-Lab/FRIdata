@@ -75,6 +75,8 @@ class Embedding:
         embedder = self.structures_dataset.embedder_type.create_embedder()
         index_of_new_embeddings = embedder.embed(sequences, self.outputs_dir)
 
+        logger.info(f"Calculated {len(index_of_new_embeddings)} new embeddings")
+
         present_embeddings.update(index_of_new_embeddings)
 
         create_index(self.embeddings_index_path, present_embeddings, self.structures_dataset.config.data_path)
