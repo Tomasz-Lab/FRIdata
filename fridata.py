@@ -151,6 +151,15 @@ def configure_logging(verbose, log_file=None):
         logger.addFilter(VerboseFilter())
 
 
+def validate_ids_file_presence(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    ids_file = getattr(args, "ids", None)
+    if ids_file and not ids_file.exists():
+        parser.error(f"File {ids_file} does not exist")
+
+def validate_create_dataset_cli_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if getattr(args, "command", None) != "create_dataset":
+        return
+    validate_ids_file_presence(args, parser)
 
 
 def validate_inspect_h5_cli_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
@@ -182,6 +191,7 @@ def validate_generate_data_cli_args(args: argparse.Namespace, parser: argparse.A
             parser.error(
                 "generate_data requires -e/--embedder when creating a new dataset (no -p)"
             )
+    validate_ids_file_presence(args, parser)
 
 
 def create_parser():
@@ -406,6 +416,7 @@ def create_parser():
 def main():
     parser = create_parser()
     args = parser.parse_args()
+    validate_create_dataset_cli_args(args, parser)
     validate_inspect_h5_cli_args(args, parser)
     validate_generate_data_cli_args(args, parser)
 
