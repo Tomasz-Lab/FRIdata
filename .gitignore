@@ -35,3 +35,5 @@ build
 .gitnexus
 
 reports/
+
+.cursor/**/*
