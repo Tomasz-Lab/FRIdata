@@ -7,20 +7,31 @@ if TYPE_CHECKING:
     from toolbox.models.embedding.embedder.base_embedder import BaseEmbedder
 
 
+_EMBEDDINGS_EXTRA_HINT = (
+    "Embedding generation requires the optional 'embeddings' dependencies "
+    "(torch, esm, transformers). Install them with:\n"
+    "    pip install 'FRIdata[embeddings]'\n"
+    "or, for a specific CUDA version / CPU-only build, run scripts/install_pytorch.sh."
+)
+
+
 def _lazy_embedder_class(member: "EmbedderType") -> Type[BaseEmbedder]:
     name = member.name
-    if name.startswith("ESM2"):
-        from toolbox.models.embedding.embedder.esm2_embedder import ESM2Embedder
+    try:
+        if name.startswith("ESM2"):
+            from toolbox.models.embedding.embedder.esm2_embedder import ESM2Embedder
 
-        return ESM2Embedder
-    if name.startswith("ESMC"):
-        from toolbox.models.embedding.embedder.esmc_embedder import ESMCEmbedder
+            return ESM2Embedder
+        if name.startswith("ESMC"):
+            from toolbox.models.embedding.embedder.esmc_embedder import ESMCEmbedder
 
-        return ESMCEmbedder
-    if name.startswith("GLM2"):
-        from toolbox.models.embedding.embedder.glm2_embedder import GLM2Embedder
+            return ESMCEmbedder
+        if name.startswith("GLM2"):
+            from toolbox.models.embedding.embedder.glm2_embedder import GLM2Embedder
 
-        return GLM2Embedder
+            return GLM2Embedder
+    except ImportError as exc:
+        raise ImportError(f"{exc}\n\n{_EMBEDDINGS_EXTRA_HINT}") from exc
     raise ValueError(f"Unknown embedder kind for {name!r}")
 
 
