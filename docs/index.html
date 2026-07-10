@@ -4,32 +4,125 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FRIdata</title>
+  <script>
+    (function () {
+      var saved = localStorage.getItem('fridata-theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', saved);
+      } else {
+        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+      }
+    })();
+  </script>
   <style>
+    :root,
+    [data-theme="dark"] {
+      --bg-body: #0d1117;
+      --bg-surface: #161b22;
+      --bg-surface-alt: #0f141a;
+      --bg-code: #161b22;
+      --bg-table-row: #12171e;
+      --text-primary: #c9d1d9;
+      --text-heading: #e6edf3;
+      --text-muted: #8b949e;
+      --border: #30363d;
+      --link: #58a6ff;
+      --chevron: #8b949e;
+      --btn-primary-bg: #238636;
+      --btn-primary-border: #2ea043;
+      --btn-primary-hover: #2ea043;
+      --btn-outline-hover-bg: #161b22;
+      --toggle-bg: #0d1117;
+      --toggle-active-bg: #30363d;
+      --toggle-active-text: #e6edf3;
+    }
+    [data-theme="light"] {
+      --bg-body: #ffffff;
+      --bg-surface: #f6f8fa;
+      --bg-surface-alt: #ffffff;
+      --bg-code: #f6f8fa;
+      --bg-table-row: #f6f8fa;
+      --text-primary: #24292f;
+      --text-heading: #1f2328;
+      --text-muted: #656d76;
+      --border: #d0d7de;
+      --link: #0969da;
+      --chevron: #656d76;
+      --btn-primary-bg: #1a7f37;
+      --btn-primary-border: #1a7f37;
+      --btn-primary-hover: #2da44e;
+      --btn-outline-hover-bg: #f6f8fa;
+      --toggle-bg: #f6f8fa;
+      --toggle-active-bg: #ffffff;
+      --toggle-active-text: #1f2328;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #0d1117;
-      color: #c9d1d9;
+      background: var(--bg-body);
+      color: var(--text-primary);
       line-height: 1.6;
+      transition: background 0.2s ease, color 0.2s ease;
     }
-    a { color: #58a6ff; text-decoration: none; }
+    a { color: var(--link); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
+    .theme-toggle {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 100;
+      display: inline-flex;
+      padding: 0.2rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--toggle-bg);
+      gap: 0.15rem;
+    }
+    .theme-toggle button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 0.75rem;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-muted);
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .theme-toggle button:hover { color: var(--text-heading); }
+    .theme-toggle button[aria-pressed="true"] {
+      background: var(--toggle-active-bg);
+      color: var(--toggle-active-text);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+    .theme-toggle svg {
+      width: 1rem;
+      height: 1rem;
+      flex-shrink: 0;
+    }
+
     header {
-      background: #161b22;
-      border-bottom: 1px solid #30363d;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
       padding: 2rem 1rem;
       text-align: center;
     }
     header h1 {
       font-size: 2.4rem;
       font-weight: 700;
-      color: #e6edf3;
+      color: var(--text-heading);
       letter-spacing: -0.5px;
     }
     header p {
       margin-top: 0.5rem;
-      color: #8b949e;
+      color: var(--text-muted);
       font-size: 1.05rem;
     }
     .badges {
@@ -57,8 +150,8 @@
       margin-bottom: 2.5rem;
     }
     .card {
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
       border-radius: 8px;
       padding: 1.2rem 1.4rem;
     }
@@ -66,22 +159,29 @@
       font-size: 0.85rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: #8b949e;
+      color: var(--text-muted);
       margin-bottom: 0.4rem;
     }
-    .card p { font-size: 0.95rem; color: #c9d1d9; }
+    .card p { font-size: 0.95rem; color: var(--text-primary); }
+
+    .section-title {
+      font-size: 1rem;
+      color: var(--text-heading);
+      margin: 1.2rem 0 0.5rem;
+    }
+    .section-title.spaced { margin: 1.6rem 0 0.5rem; }
 
     details.section {
       margin-bottom: 1rem;
-      background: #0f141a;
-      border: 1px solid #30363d;
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
     }
     details.section > summary {
       font-size: 1.25rem;
       font-weight: 600;
-      color: #e6edf3;
+      color: var(--text-heading);
       padding: 1rem 1.4rem;
       cursor: pointer;
       list-style: none;
@@ -95,20 +195,20 @@
       content: "";
       width: 0.5rem;
       height: 0.5rem;
-      border-right: 2px solid #8b949e;
-      border-bottom: 2px solid #8b949e;
+      border-right: 2px solid var(--chevron);
+      border-bottom: 2px solid var(--chevron);
       transform: rotate(-45deg);
       transition: transform 0.15s ease;
       flex-shrink: 0;
     }
     details.section[open] > summary::before { transform: rotate(45deg); }
-    details.section > summary:hover { color: #58a6ff; }
-    details.section > summary:hover::before { border-color: #58a6ff; }
+    details.section > summary:hover { color: var(--link); }
+    details.section > summary:hover::before { border-color: var(--link); }
     details.section .section-body { padding: 0 1.4rem 1.4rem; }
 
     details.subcmd {
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
       border-radius: 6px;
       overflow: hidden;
       margin-bottom: 0.6rem;
@@ -123,41 +223,41 @@
       user-select: none;
       font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
       font-size: 0.92rem;
-      color: #e6edf3;
+      color: var(--text-heading);
     }
     details.subcmd > summary::-webkit-details-marker { display: none; }
     details.subcmd > summary::before {
       content: "";
       width: 0.42rem;
       height: 0.42rem;
-      border-right: 2px solid #8b949e;
-      border-bottom: 2px solid #8b949e;
+      border-right: 2px solid var(--chevron);
+      border-bottom: 2px solid var(--chevron);
       transform: rotate(-45deg);
       transition: transform 0.15s ease;
       flex-shrink: 0;
     }
     details.subcmd[open] > summary::before { transform: rotate(45deg); }
-    details.subcmd > summary:hover { color: #58a6ff; }
-    details.subcmd > summary:hover::before { border-color: #58a6ff; }
+    details.subcmd > summary:hover { color: var(--link); }
+    details.subcmd > summary:hover::before { border-color: var(--link); }
     details.subcmd > pre { margin: 0 1rem 1rem; }
 
     ol, ul { padding-left: 1.4rem; }
     li { margin-bottom: 0.4rem; }
 
     pre {
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
       border-radius: 6px;
       padding: 1rem 1.2rem;
       overflow-x: auto;
       font-size: 0.875rem;
-      color: #e6edf3;
+      color: var(--text-heading);
       margin: 0.75rem 0;
     }
     code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
     p code, li code, td code {
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
       border-radius: 4px;
       padding: 0.1rem 0.35rem;
       font-size: 0.85em;
@@ -172,17 +272,17 @@
     th, td {
       text-align: left;
       padding: 0.55rem 0.8rem;
-      border: 1px solid #30363d;
+      border: 1px solid var(--border);
       vertical-align: top;
     }
     th {
-      background: #161b22;
-      color: #e6edf3;
+      background: var(--bg-surface);
+      color: var(--text-heading);
       font-weight: 600;
       white-space: nowrap;
     }
     td:first-child { white-space: nowrap; }
-    tbody tr:nth-child(even) { background: #12171e; }
+    tbody tr:nth-child(even) { background: var(--bg-table-row); }
 
     .btn {
       display: inline-block;
@@ -190,29 +290,45 @@
       border-radius: 6px;
       font-size: 0.9rem;
       font-weight: 500;
-      background: #238636;
+      background: var(--btn-primary-bg);
       color: #fff;
-      border: 1px solid #2ea043;
+      border: 1px solid var(--btn-primary-border);
     }
-    .btn:hover { background: #2ea043; text-decoration: none; }
+    .btn:hover { background: var(--btn-primary-hover); text-decoration: none; }
     .btn-outline {
       background: transparent;
-      color: #58a6ff;
-      border-color: #30363d;
+      color: var(--link);
+      border-color: var(--border);
       margin-left: 0.6rem;
     }
-    .btn-outline:hover { background: #161b22; }
+    .btn-outline:hover { background: var(--btn-outline-hover-bg); }
 
     footer {
       text-align: center;
       padding: 2rem 1rem;
       font-size: 0.85rem;
-      color: #8b949e;
-      border-top: 1px solid #30363d;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
     }
   </style>
 </head>
 <body>
+
+<div class="theme-toggle" role="group" aria-label="Color theme">
+  <button type="button" data-theme-choice="light" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+    </svg>
+    Light
+  </button>
+  <button type="button" data-theme-choice="dark" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+    Dark
+  </button>
+</div>
 
 <header>
   <h1>FRIdata</h1>
@@ -407,7 +523,7 @@ sbatch --gres=gpu[:gpu-number] --time=&lt;HH:MM:SS&gt; --account=&lt;grant name&
     <p>FRIdata is organized into sub-commands. The most common is <code>generate_data</code>,
        which creates a dataset and generates the requested data types in one run.</p>
 
-    <h3 style="font-size:1rem;color:#e6edf3;margin:1.2rem 0 0.5rem;">Sub-commands</h3>
+    <h3 class="section-title">Sub-commands</h3>
     <div class="table-wrap">
       <table>
         <thead>
@@ -431,7 +547,7 @@ sbatch --gres=gpu[:gpu-number] --time=&lt;HH:MM:SS&gt; --account=&lt;grant name&
       </table>
     </div>
 
-    <h3 style="font-size:1rem;color:#e6edf3;margin:1.6rem 0 0.5rem;">Dataset options</h3>
+    <h3 class="section-title spaced">Dataset options</h3>
     <div class="table-wrap">
       <table>
         <thead>
@@ -460,7 +576,7 @@ sbatch --gres=gpu[:gpu-number] --time=&lt;HH:MM:SS&gt; --account=&lt;grant name&
       </table>
     </div>
 
-    <h3 style="font-size:1rem;color:#e6edf3;margin:1.6rem 0 0.5rem;">Choices</h3>
+    <h3 class="section-title spaced">Choices</h3>
     <div class="table-wrap">
       <table>
         <thead>
@@ -747,6 +863,49 @@ options:
   FRIdata &mdash; <a href="https://github.com/Tomasz-Lab/FRIdata/blob/main/LICENSE">BSD-3-Clause License</a>
   &mdash; <a href="https://github.com/Tomasz-Lab">Tomasz-Lab</a>
 </footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var media = window.matchMedia('(prefers-color-scheme: dark)');
+    var buttons = document.querySelectorAll('[data-theme-choice]');
+
+    function updateButtons(theme) {
+      buttons.forEach(function (btn) {
+        btn.setAttribute('aria-pressed', btn.getAttribute('data-theme-choice') === theme ? 'true' : 'false');
+      });
+    }
+
+    function applyTheme(theme) {
+      root.setAttribute('data-theme', theme);
+      updateButtons(theme);
+    }
+
+    function systemTheme() {
+      return media.matches ? 'dark' : 'light';
+    }
+
+    function syncFromPreference() {
+      var saved = localStorage.getItem('fridata-theme');
+      applyTheme(saved === 'light' || saved === 'dark' ? saved : systemTheme());
+    }
+
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var theme = btn.getAttribute('data-theme-choice');
+        localStorage.setItem('fridata-theme', theme);
+        applyTheme(theme);
+      });
+    });
+
+    media.addEventListener('change', function () {
+      if (localStorage.getItem('fridata-theme')) return;
+      applyTheme(systemTheme());
+    });
+
+    syncFromPreference();
+  })();
+</script>
 
 </body>
 </html>
