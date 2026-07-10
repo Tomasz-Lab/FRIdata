@@ -7,6 +7,18 @@
 [![Source](https://img.shields.io/badge/source-GitHub-303030.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/)
 [![GitHub issues](https://img.shields.io/github/issues/Tomasz-Lab/FRIdata.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/issues)
 
+Imagine regularly downloading new releases of protein databases (PDB, UniProt, AFDB, ESMAtlas, etc.) and having to process them efficiently while avoiding redundant computations. It's a surprisingly frustrating problem.
+
+FRIdata (*free data*) is a protein data generation and storage workflow that produces non-redundant protein derivatives, e.g.:
+- 3D coordinates and distograms
+- Sequences and protein language model embeddings (ESM-2, ESM-C, gLM-2, etc.)
+- HTML reports showing data dependencies
+Leveraging Dask, it is highly efficient and scalable
+
+In [deepFRI2](https://github.com/Tomasz-Lab/deepFRI2) training, we use FRIdata to manage different releases of the Gene Ontology Annotation (GOA) database, stratified by annotation quality.
+
+The repository is currently under active development. If you run into installation problems, find a bug, or would like to propose an improvement, please raise an issue or write directly to p.szczerbiak[at]sanoscience.org.
+
 ## Installation and activation
 
 1. Download the repo
