@@ -37,3 +37,4 @@ build
 reports/
 
 .cursor/**/*
+.DS_Store
