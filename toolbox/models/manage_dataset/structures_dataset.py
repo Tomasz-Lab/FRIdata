@@ -279,9 +279,13 @@ class StructuresDataset(BaseModel):
         self.save_dataset_metadata()
 
     def extract_sequence_and_coordinates(
-        self, ca_mask: bool = False, substitute_non_standard_aminoacids: bool = True
+        self,
+        is_sequences_retrieved: bool = True,
+        is_coordinates_retrieved: bool = True,
+        ca_mask: bool = False,
+        substitute_non_standard_aminoacids: bool = True
     ):
-        self._sequence_retriever.retrieve(self.config.disto_type)
+        self._sequence_retriever.retrieve(is_sequences_retrieved, is_coordinates_retrieved)
 
     def get_all_ids(self):
         match self.db_type:

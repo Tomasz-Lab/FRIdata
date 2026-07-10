@@ -145,6 +145,8 @@ def __get_sequences_and_coordinates_from_batch__(
     codes: List[str],
     carbon_atom_type: CarbonAtomType,
     batch_output_path: str,
+    is_sequences_retrieved: bool,
+    is_coordinates_retrieved: bool,
     protein_ranges: Optional[Dict[str, List[Tuple[int, int]]]] = None,
 ) -> Tuple[List[str], Dict[str, str]]:
     """
@@ -189,23 +191,26 @@ def __get_sequences_and_coordinates_from_batch__(
             )
             
             # Add sequence to FASTA format
-            sequence_lines.append(f">{clean_code}\n{sequence}\n")
+            if is_sequences_retrieved:
+                sequence_lines.append(f">{clean_code}\n{sequence}\n")
             
             # Store only coordinates with breaks (aligned to sequence), rename to 'coords'
-            coordinates_data[clean_code] = {
-                'coords': np.array(coords_with_gaps, dtype=np.float32)
-            }
+            if is_coordinates_retrieved:
+                coordinates_data[clean_code] = {
+                    'coords': np.array(coords_with_gaps, dtype=np.float32)
+                }
             
         except Exception as e:
             logger.error(f"Error processing {code}: {e}")
             continue
+
+    coords_index_partial = {}
     
-    # Save coordinates to H5 file
-    coordinates_h5_path = _save_coordinates_to_h5(batch_output_path, coordinates_data)
-    
-    # Build mapping of protein_id -> created H5 file path
-    coords_index_partial = {protein_id: coordinates_h5_path for protein_id in coordinates_data.keys()}
-    
+    if is_coordinates_retrieved:
+        # Save coordinates to H5 file
+        coordinates_h5_path = _save_coordinates_to_h5(batch_output_path, coordinates_data)
+        coords_index_partial = {protein_id: coordinates_h5_path for protein_id in coordinates_data.keys()}
+        
     return sequence_lines, coords_index_partial
 
 
@@ -255,7 +260,9 @@ class SequenceAndCoordinatesRetriever:
         self.handle_indexes: HandleIndexes = self.structures_dataset._handle_indexes
 
     def retrieve(
-        self, 
+        self,
+        is_sequences_retrieved: bool,
+        is_coordinates_retrieved: bool,
         carbon_atom_type: CarbonAtomType = "CA",
     ):
         """
@@ -321,50 +328,58 @@ class SequenceAndCoordinatesRetriever:
         sequences_file_name = f"{base_name}{atom_suffix}.fasta"
         sequences_file_path = sequences_path_obj / sequences_file_name
 
-        with open(sequences_file_path, "w") as f:
+        def collect(result):
+            sequence_lines, coords_mapping = result
+            if is_sequences_retrieved:
+                sequences_file.writelines(sequence_lines)
+            coordinates_index.update(coords_mapping)
 
-            def collect(result):
-                sequence_lines, coords_mapping = result
-                f.writelines(sequence_lines)
-                # Merge the per-protein mapping returned from the batch
-                coordinates_index.update(coords_mapping)
+        compute = ComputeBatches(client, run, collect, "sequences_and_coordinates")
 
-            compute = ComputeBatches(client, run, collect, "sequences_and_coordinates")
-
-            inputs = (
-                (
-                    file, 
-                    codes, 
-                    carbon_atom_type,
-                    str(coordinates_path_obj / f"batch_{i}_{carbon_atom_type.lower()}"),
-                    protein_ranges,  # Pass the protein ranges to each batch
-                )
-                for i, (file, codes) in enumerate(h5_file_to_codes.items())
+        inputs = (
+            (
+                file,
+                codes,
+                carbon_atom_type,
+                str(coordinates_path_obj / f"batch_{i}_{carbon_atom_type.lower()}"),
+                is_sequences_retrieved,
+                is_coordinates_retrieved,
+                protein_ranges,
             )
-
-            compute.compute(inputs)
-
-        logger.info("Saving sequences and coordinates")
-        
-        # Update index with sequence file path (store as string like the original sequence_retriever)
-        for id_ in missing_sequences:
-            sequences_coords_index[id_] = str(sequences_file_path)
-        
-        # Save sequences index using the standard sequences.idx file
-        sequences_index_path = structures_dataset.sequences_index_path()
-        create_index(sequences_index_path, sequences_coords_index, structures_dataset.config.data_path)
-
-        ids_to_process = list(coordinates_index.keys())
-        for protein_id in ids_to_process:
-            if protein_id.endswith(".pdb"):
-                coordinates_index[protein_id.removesuffix(".pdb")] = coordinates_index.pop(protein_id)
-
-        # Save / update the coordinates index on disk
-        create_index(
-            structures_dataset.coordinates_index_path(), 
-            coordinates_index, 
-            structures_dataset.config.data_path
+            for i, (file, codes) in enumerate(h5_file_to_codes.items())
         )
+
+        sequences_file = open(sequences_file_path, "w") if is_sequences_retrieved else None
+        try:
+            compute.compute(inputs)
+        finally:
+            if sequences_file is not None:
+                sequences_file.close()
+
+        log_line = f"Saving {'sequences' if is_sequences_retrieved else ''} {'and' if is_sequences_retrieved and is_coordinates_retrieved else ''} {'coordinates' if is_coordinates_retrieved else ''}"
+        logger.info(log_line)
+
+        if is_sequences_retrieved:
+            # Update index with sequence file path (store as string like the original sequence_retriever)
+            for id_ in missing_sequences:
+                sequences_coords_index[id_] = str(sequences_file_path)
+            
+            # Save sequences index using the standard sequences.idx file
+            sequences_index_path = structures_dataset.sequences_index_path()
+            create_index(sequences_index_path, sequences_coords_index, structures_dataset.config.data_path)
+
+        if is_coordinates_retrieved:
+            ids_to_process = list(coordinates_index.keys())
+            for protein_id in ids_to_process:
+                if protein_id.endswith(".pdb"):
+                    coordinates_index[protein_id.removesuffix(".pdb")] = coordinates_index.pop(protein_id)
+
+            # Save / update the coordinates index on disk
+            create_index(
+                structures_dataset.coordinates_index_path(), 
+                coordinates_index, 
+                structures_dataset.config.data_path
+            )
 
         end = time.time()
         logger.info(f"Total time: {format_time(end - start)}")

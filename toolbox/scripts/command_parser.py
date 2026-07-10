@@ -165,7 +165,10 @@ class CommandParser:
         self._configure_dataset_logging()
 
         self.structures_dataset.extract_sequence_and_coordinates(
-            self.args.ca_mask, self.args.no_substitution
+            is_sequences_retrieved=True,
+            is_coordinates_retrieved=False,
+            ca_mask=self.args.ca_mask,
+            substitute_non_standard_aminoacids=not self.args.no_substitution,
         )
 
     def generate_distograms(self):
@@ -328,16 +331,27 @@ class CommandParser:
                 self._finish_generate_data(total_time, is_error=True)
                 return
 
+        is_sequences_retrieved = "sequences" in selected or run_all
+        is_coordinates_retrieved = "coordinates" in selected or run_all
+
         # Step 2: sequences and coordinates (single step produces both)
-        if "sequences" in selected or "coordinates" in selected or run_all:
+        if is_sequences_retrieved or is_coordinates_retrieved:
             sequences_and_coordinates_ok = False
             try:
-                ds.extract_sequence_and_coordinates()
+                ds.extract_sequence_and_coordinates(
+                    is_sequences_retrieved = is_sequences_retrieved,
+                    is_coordinates_retrieved = is_coordinates_retrieved,
+                )
                 sequences_and_coordinates_ok = True
             except Exception as e:
                 print_exc(e)
                 is_error = True
-            if sequences_and_coordinates_ok:
+            if sequences_and_coordinates_ok and (
+                is_sequences_retrieved
+                or "distograms" in selected
+                or "embeddings" in selected
+                or run_all
+            ):
                 seq_idx = read_index(
                     ds.sequences_index_path(),
                     ds.config.data_path,

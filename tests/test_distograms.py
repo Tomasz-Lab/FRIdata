@@ -26,7 +26,9 @@ def test_full():
     name = '2fjh_L'
     name_out = inspect.currentframe().f_code.co_name
 
-    __get_sequences_and_coordinates_from_batch__(INPATH / f"pdbs.h5", [f"{name}.pdb"], "CA", OUTPATH / name_out)
+    __get_sequences_and_coordinates_from_batch__(
+        INPATH / f"pdbs.h5", [f"{name}.pdb"], "CA", OUTPATH / name_out, False, True
+    )
     coordinates = __process_coordinates__([OUTPATH / f"{name_out}.h5"], [name])
     
     expected = np.load(EXPPATH / f"{name}.npy")
@@ -41,7 +43,9 @@ def test_cropped():
     name = '1aa6_Acropped'
     name_out = inspect.currentframe().f_code.co_name
 
-    __get_sequences_and_coordinates_from_batch__(INPATH / f"pdbs.h5", [f"{name}.pdb"], "CA", OUTPATH / name_out)
+    __get_sequences_and_coordinates_from_batch__(
+        INPATH / f"pdbs.h5", [f"{name}.pdb"], "CA", OUTPATH / name_out, False, True
+    )
     coordinates = __process_coordinates__([OUTPATH / f"{name_out}.h5"], [name])
     expected = ~np.isnan(np.load(EXPPATH / f"{name}.npy"))
 
@@ -57,7 +61,9 @@ def test_missing_CA():
     name = '1aa6_Amisssing_CA_or_CB'
     name_out = inspect.currentframe().f_code.co_name
 
-    __get_sequences_and_coordinates_from_batch__(INPATH / f"pdbs.h5", [f"{name}.pdb"], "CA", OUTPATH / name_out)
+    __get_sequences_and_coordinates_from_batch__(
+        INPATH / f"pdbs.h5", [f"{name}.pdb"], "CA", OUTPATH / name_out, False, True
+    )
     coordinates = __process_coordinates__([OUTPATH / f"{name_out}.h5"], [name])
     expected = np.load(EXPPATH / f"{name}_version_CA.npy")
 
@@ -73,7 +79,9 @@ def test_missing_CB():
     name = '1aa6_Amisssing_CA_or_CB'
     name_out = inspect.currentframe().f_code.co_name
 
-    __get_sequences_and_coordinates_from_batch__(INPATH / f"pdbs.h5", [f"{name}.pdb"], "CB", OUTPATH / name_out)
+    __get_sequences_and_coordinates_from_batch__(
+        INPATH / f"pdbs.h5", [f"{name}.pdb"], "CB", OUTPATH / name_out, False, True
+    )
     coordinates = __process_coordinates__([OUTPATH / f"{name_out}.h5"], [name])
     expected = np.load(EXPPATH / f"{name}_version_CB.npy")
 
@@ -86,7 +94,9 @@ def test_missing_one():
     name = '5uyl_32oneX'
     name_out = inspect.currentframe().f_code.co_name
 
-    __get_sequences_and_coordinates_from_batch__(INPATH / f"pdbs.h5", [f"{name}.pdb"], "CA", OUTPATH / name_out)
+    __get_sequences_and_coordinates_from_batch__(
+        INPATH / f"pdbs.h5", [f"{name}.pdb"], "CA", OUTPATH / name_out, False, True
+    )
     coordinates = __process_coordinates__([OUTPATH / f"{name_out}.h5"], [name])
     expected = np.load(EXPPATH / f"{name}.npy")
 
@@ -99,7 +109,9 @@ def test_missing_two():
     name = '5uyl_32twoX'
     name_out = inspect.currentframe().f_code.co_name
 
-    __get_sequences_and_coordinates_from_batch__(INPATH / f"pdbs.h5", [f"{name}.pdb"], "CA", OUTPATH / name_out)
+    __get_sequences_and_coordinates_from_batch__(
+        INPATH / f"pdbs.h5", [f"{name}.pdb"], "CA", OUTPATH / name_out, False, True
+    )
     coordinates = __process_coordinates__([OUTPATH / f"{name_out}.h5"], [name])
     expected = np.load(EXPPATH / f"{name}.npy")
 
