@@ -134,13 +134,91 @@
     }
     .badges img { height: 20px; }
 
-    main {
-      width: 75%;
+    .docs-layout {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 2rem;
+      max-width: 1200px;
       margin: 2.5rem auto;
       padding: 0 1.5rem;
+      align-items: start;
     }
-    @media (max-width: 768px) {
-      main { width: 90%; }
+    .sidebar {
+      position: sticky;
+      top: 1.5rem;
+      align-self: start;
+    }
+    .sidebar nav {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 0;
+    }
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .sidebar li { margin: 0; }
+    .sidebar a {
+      display: block;
+      padding: 0.45rem 1rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      border-left: 2px solid transparent;
+      text-decoration: none;
+    }
+    .sidebar a:hover {
+      color: var(--text-heading);
+      text-decoration: none;
+      background: var(--bg-surface-alt);
+    }
+    .sidebar a.active {
+      color: var(--link);
+      border-left-color: var(--link);
+      font-weight: 500;
+    }
+    .docs-content {
+      min-width: 0;
+    }
+    .nav-section-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-heading);
+      margin: 0 0 1rem;
+      scroll-margin-top: 1.5rem;
+    }
+    section[id] { scroll-margin-top: 1.5rem; }
+    .lead { color: var(--text-muted); margin-bottom: 1rem; }
+    @media (max-width: 900px) {
+      .docs-layout {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+      .sidebar {
+        position: static;
+      }
+      .sidebar nav {
+        display: flex;
+        overflow-x: auto;
+        padding: 0.5rem;
+        gap: 0.25rem;
+      }
+      .sidebar ul {
+        display: flex;
+        gap: 0.25rem;
+        white-space: nowrap;
+      }
+      .sidebar a {
+        padding: 0.4rem 0.75rem;
+        border-left: none;
+        border-radius: 6px;
+        border: 1px solid transparent;
+      }
+      .sidebar a.active {
+        border-color: var(--border);
+        background: var(--bg-surface-alt);
+      }
     }
 
     .cards {
@@ -345,12 +423,26 @@
   </div>
 </header>
 
-<main>
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation navigation">
+    <nav>
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#installation">Installation</a></li>
+        <li><a href="#usage">Usage examples</a></li>
+        <li><a href="#api">API reference</a></li>
+        <li><a href="#commands">Command reference</a></li>
+      </ul>
+    </nav>
+  </aside>
 
+  <main class="docs-content">
+
+  <section id="overview">
   <div class="cards">
     <div class="card">
       <h3>Purpose</h3>
-      <p>Generate sequences, coordinates, distograms, and embeddings from protein structures at scale.</p>
+      <p>Generate sequences, coordinates, distograms, and embeddings from protein structures at scale. Supports PDB, AFDB, ESMatlas, and local/custom inputs.</p>
     </div>
     <div class="card">
       <h3>Backend</h3>
@@ -358,12 +450,55 @@
     </div>
     <div class="card">
       <h3>HPC Ready</h3>
-      <p>Comes with SLURM scripts for PLGrid infrastructure. Supports AlphaFold DB (AFDB) structures.</p>
+      <p>Includes SLURM job scripts for the PLGrid infrastructure as examples.</p>
     </div>
   </div>
 
-  <details class="section" open>
-    <summary>Installation &amp; Activation</summary>
+  <h2 class="nav-section-title" style="margin-top:2rem;">How FRIdata works</h2>
+  <p>Every dataset is defined by a <strong>database type</strong> (<code>-d</code>, <code>--db</code>) and a
+     <strong>collection type</strong> (<code>-c</code>, <code>--collection</code>), plus optional
+     <code>--proteome</code> and <code>--version</code>. Together they determine the dataset name
+     (for example <code>AFDB-subset--test</code>) and how structures are resolved.</p>
+  <p>Use <code>-t</code> / <code>--type</code> to choose what to generate in a run:
+     <code>sequences</code>, <code>coordinates</code>, <code>distograms</code>, <code>embeddings</code>,
+     or <code>all</code>.</p>
+
+  <h3 class="section-title">Database type (<code>-d</code>, <code>--db</code>)</h3>
+  <p class="lead">Where structures come from.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Value</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>PDB</code></td><td>RCSB PDB structures (download by ID)</td></tr>
+        <tr><td><code>AFDB</code></td><td>AlphaFold Database</td></tr>
+        <tr><td><code>ESMatlas</code></td><td>ESM Atlas</td></tr>
+        <tr><td><code>other</code></td><td>Local or custom files via <code>--input-path</code> or archives</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="section-title spaced">Collection type (<code>-c</code>, <code>--collection</code>)</h3>
+  <p class="lead">How much of that source to include.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Value</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>all</code></td><td>Full database collection</td></tr>
+        <tr><td><code>part</code></td><td>AFDB proteome partition (requires <code>--proteome</code>; foldcomp-based)</td></tr>
+        <tr><td><code>clust</code></td><td>AFDB cluster partition (requires <code>--proteome</code>; foldcomp-based)</td></tr>
+        <tr><td><code>subset</code></td><td>User-defined ID list via <code>-i</code> / <code>--ids</code> (optionally <code>--input-path</code> for local structures)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  </section>
+
+  <section id="installation">
+  <details class="section">
+    <summary>Installation</summary>
     <div class="section-body">
     <ol>
       <li>Clone the repository
@@ -413,9 +548,15 @@ mamba run -n fridata_env python -m pip install -r requirements-fridata.txt
        ensure the directory containing <code>fridata_env_conda.yml</code> is writable.</p>
     </div>
   </details>
+  </section>
+
+  <section id="usage">
+  <h2 class="nav-section-title">Usage examples</h2>
+  <p class="lead">Runnable walkthroughs for common setups. AFDB is one supported database; see
+     <a href="#overview">Overview</a> for the full <code>-d</code> / <code>-c</code> model.</p>
 
   <details class="section">
-    <summary>Running on AFDB Structures Locally</summary>
+    <summary>AFDB subset (local)</summary>
     <div class="section-body">
     <p>Requires a directory of AFDB structures and a text file listing AFDB IDs (one
        per line, <code>\n</code> delimited). Assumes the installation steps above succeeded.</p>
@@ -449,7 +590,7 @@ PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/fridata.py \
   </details>
 
   <details class="section">
-    <summary>Running as a CLI Tool</summary>
+    <summary>CLI installation</summary>
     <div class="section-body">
     <p>From the <code>FRIdata</code> directory, install it as a CLI tool:</p>
     <pre><code>python3 -m pip install -e .
@@ -462,7 +603,7 @@ fridata &lt;...&gt;</code></pre>
   </details>
 
   <details class="section">
-    <summary>Running on HPC (PLGrid / SLURM)</summary>
+    <summary>HPC (PLGrid / SLURM)</summary>
     <div class="section-body">
     <p>Running FRIdata on HPC differs between CPU and GPU nodes. These instructions are
        valid for HPC hosted in PLGrid infrastructure; other infrastructures may require
@@ -515,11 +656,14 @@ sbatch --gres=gpu[:gpu-number] --time=&lt;HH:MM:SS&gt; --account=&lt;grant name&
   scripts/hpc/run_slurm.sh embeddings</code></pre>
     </div>
   </details>
+  </section>
 
-  <details class="section">
-    <summary>Available Parameters</summary>
+  <section id="api">
+  <details class="section" open>
+    <summary>API reference</summary>
     <div class="section-body">
 
+    <p>Primary documentation &mdash; start here for flags, subcommands, and accepted values.</p>
     <p>FRIdata is organized into sub-commands. The most common is <code>generate_data</code>,
        which creates a dataset and generates the requested data types in one run.</p>
 
@@ -591,12 +735,14 @@ sbatch --gres=gpu[:gpu-number] --time=&lt;HH:MM:SS&gt; --account=&lt;grant name&
     </div>
     </div>
   </details>
+  </section>
 
+  <section id="commands">
   <details class="section">
-    <summary>Example usage</summary>
+    <summary>Command reference (<code>--help</code>)</summary>
     <div class="section-body">
-    <p>Each sub-command below shows its <code>--help</code> output. Run
-       <code>fridata &lt;subcommand&gt; --help</code> to reproduce it.</p>
+    <p>Verbatim output of <code>fridata &lt;subcommand&gt; --help</code> for each subcommand. Run
+       <code>fridata &lt;subcommand&gt; --help</code> locally to reproduce it.</p>
 
     <details class="subcmd">
       <summary>generate_data</summary>
@@ -856,8 +1002,10 @@ options:
     </details>
     </div>
   </details>
+  </section>
 
-</main>
+  </main>
+</div>
 
 <footer>
   FRIdata &mdash; <a href="https://github.com/Tomasz-Lab/FRIdata/blob/main/LICENSE">BSD-3-Clause License</a>
@@ -904,6 +1052,49 @@ options:
     });
 
     syncFromPreference();
+  })();
+
+  (function () {
+    var navLinks = document.querySelectorAll('.sidebar a[href^="#"]');
+    var sections = [];
+    navLinks.forEach(function (link) {
+      var id = link.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) sections.push({ id: id, el: el, link: link });
+    });
+
+    function setActive(id) {
+      navLinks.forEach(function (link) {
+        link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+      });
+    }
+
+    function onScroll() {
+      var scrollY = window.scrollY + 100;
+      var current = sections[0] ? sections[0].id : '';
+      for (var i = 0; i < sections.length; i++) {
+        if (sections[i].el.offsetTop <= scrollY) {
+          current = sections[i].id;
+        }
+      }
+      setActive(current);
+    }
+
+    navLinks.forEach(function (link) {
+      link.addEventListener('click', function (e) {
+        var id = link.getAttribute('href').slice(1);
+        var el = document.getElementById(id);
+        if (el) {
+          e.preventDefault();
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          setActive(id);
+          history.replaceState(null, '', '#' + id);
+        }
+      });
+    });
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
   })();
 </script>
 
