@@ -9,6 +9,11 @@ import h5py
 
 from os.path import join
 
+# Embedding tests need the optional 'embeddings' extra (torch/esm/transformers).
+# Skip the whole module gracefully when it is not installed so a core-only
+# `pip install -e .[test]` checkout can still run the rest of the suite.
+pytest.importorskip("torch", reason="install FRIdata[embeddings] to run embedding tests")
+
 from toolbox.models.embedding.embedder.esm2_embedder import ESM2Embedder
 from tests.utils import compare_pdb_files
 from pathlib import Path
