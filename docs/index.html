@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FRIdata</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      line-height: 1.6;
+    }
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+    header h1 {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: #e6edf3;
+      letter-spacing: -0.5px;
+    }
+    header p {
+      margin-top: 0.5rem;
+      color: #8b949e;
+      font-size: 1.05rem;
+    }
+    .badges {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      justify-content: center;
+    }
+    .badges img { height: 20px; }
+
+    main {
+      width: 75%;
+      margin: 2.5rem auto;
+      padding: 0 1.5rem;
+    }
+    @media (max-width: 768px) {
+      main { width: 90%; }
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 1.2rem 1.4rem;
+    }
+    .card h3 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #8b949e;
+      margin-bottom: 0.4rem;
+    }
+    .card p { font-size: 0.95rem; color: #c9d1d9; }
+
+    details.section {
+      margin-bottom: 1rem;
+      background: #0f141a;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    details.section > summary {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #e6edf3;
+      padding: 1rem 1.4rem;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      user-select: none;
+    }
+    details.section > summary::-webkit-details-marker { display: none; }
+    details.section > summary::before {
+      content: "";
+      width: 0.5rem;
+      height: 0.5rem;
+      border-right: 2px solid #8b949e;
+      border-bottom: 2px solid #8b949e;
+      transform: rotate(-45deg);
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+    }
+    details.section[open] > summary::before { transform: rotate(45deg); }
+    details.section > summary:hover { color: #58a6ff; }
+    details.section > summary:hover::before { border-color: #58a6ff; }
+    details.section .section-body { padding: 0 1.4rem 1.4rem; }
+
+    details.subcmd {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 0.6rem;
+    }
+    details.subcmd > summary {
+      padding: 0.65rem 1rem;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      user-select: none;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.92rem;
+      color: #e6edf3;
+    }
+    details.subcmd > summary::-webkit-details-marker { display: none; }
+    details.subcmd > summary::before {
+      content: "";
+      width: 0.42rem;
+      height: 0.42rem;
+      border-right: 2px solid #8b949e;
+      border-bottom: 2px solid #8b949e;
+      transform: rotate(-45deg);
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+    }
+    details.subcmd[open] > summary::before { transform: rotate(45deg); }
+    details.subcmd > summary:hover { color: #58a6ff; }
+    details.subcmd > summary:hover::before { border-color: #58a6ff; }
+    details.subcmd > pre { margin: 0 1rem 1rem; }
+
+    ol, ul { padding-left: 1.4rem; }
+    li { margin-bottom: 0.4rem; }
+
+    pre {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      font-size: 0.875rem;
+      color: #e6edf3;
+      margin: 0.75rem 0;
+    }
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    p code, li code, td code {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 0.1rem 0.35rem;
+      font-size: 0.85em;
+    }
+
+    .table-wrap { overflow-x: auto; margin: 0.75rem 0; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 0.9rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.55rem 0.8rem;
+      border: 1px solid #30363d;
+      vertical-align: top;
+    }
+    th {
+      background: #161b22;
+      color: #e6edf3;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    td:first-child { white-space: nowrap; }
+    tbody tr:nth-child(even) { background: #12171e; }
+
+    .btn {
+      display: inline-block;
+      padding: 0.5rem 1.2rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      background: #238636;
+      color: #fff;
+      border: 1px solid #2ea043;
+    }
+    .btn:hover { background: #2ea043; text-decoration: none; }
+    .btn-outline {
+      background: transparent;
+      color: #58a6ff;
+      border-color: #30363d;
+      margin-left: 0.6rem;
+    }
+    .btn-outline:hover { background: #161b22; }
+
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      font-size: 0.85rem;
+      color: #8b949e;
+      border-top: 1px solid #30363d;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>FRIdata</h1>
+  <p>High-performance protein structure data processing with Dask</p>
+  <div class="badges">
+    <img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg?style=flat-square" alt="License">
+    <img src="https://img.shields.io/badge/python-3.10-blue.svg?style=flat-square&logo=python" alt="Python">
+    <img src="https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml/badge.svg" alt="CI">
+    <img src="https://img.shields.io/badge/impl-Dask-blue" alt="Dask">
+  </div>
+  <div style="margin-top:1.2rem;">
+    <a href="https://github.com/Tomasz-Lab/FRIdata" class="btn">View on GitHub</a>
+    <a href="https://github.com/Tomasz-Lab/FRIdata/issues" class="btn btn-outline">Issues</a>
+  </div>
+</header>
+
+<main>
+
+  <div class="cards">
+    <div class="card">
+      <h3>Purpose</h3>
+      <p>Generate sequences, coordinates, distograms, and embeddings from protein structures at scale.</p>
+    </div>
+    <div class="card">
+      <h3>Backend</h3>
+      <p>Built on <a href="https://docs.dask.org/">Dask</a> for distributed, parallel processing on CPU and GPU clusters.</p>
+    </div>
+    <div class="card">
+      <h3>HPC Ready</h3>
+      <p>Comes with SLURM scripts for PLGrid infrastructure. Supports AlphaFold DB (AFDB) structures.</p>
+    </div>
+  </div>
+
+  <details class="section" open>
+    <summary>Installation &amp; Activation</summary>
+    <div class="section-body">
+    <ol>
+      <li>Clone the repository
+        <pre><code>git clone https://github.com/Tomasz-Lab/FRIdata.git
+cd FRIdata</code></pre>
+      </li>
+      <li><a href="https://www.anaconda.com/docs/getting-started/miniconda/install">Install Miniconda</a>, then install mamba:
+        <pre><code># prioritize the conda-forge channel
+conda config --add channels conda-forge
+conda update -n base --all
+conda install -n base mamba</code></pre>
+      </li>
+      <li>Create the environment (recommended). The setup script creates the conda
+          environment, installs the pip dependencies, and installs a PyTorch build
+          matched to your GPU driver:
+        <pre><code># default install
+./scripts/setup_env.sh
+
+# custom environment name
+./scripts/setup_env.sh -n fridata_gpu_verify
+
+# CPU-only systems
+./scripts/setup_env.sh --cpu</code></pre>
+      </li>
+      <li>Activate the environment
+        <pre><code># shell type is one of: bash, cmd.exe, dash, fish, nu, posix, powershell, tcsh, xonsh, zsh
+eval "$(mamba shell hook --shell &lt;shell type&gt;)"
+mamba activate fridata_env</code></pre>
+      </li>
+      <li> (Optional) Run tests to verify the installation
+        <pre><code>pytest ./tests</code></pre>
+      </li>
+    </ol>
+
+    <p style="margin-top:1rem;"><strong>Manual installation</strong> &mdash; if you prefer to run the steps yourself:</p>
+    <pre><code>mamba env create -f fridata_env_conda.yml -n fridata_env
+mamba run -n fridata_env python -m pip install -r requirements-fridata.txt
+./scripts/install_pytorch.sh</code></pre>
+    <p>Pip dependencies live in <code>requirements-fridata.txt</code> rather than
+       <code>fridata_env_conda.yml</code> so environment creation works from read-only
+       repository checkouts.</p>
+
+    <p style="margin-top:1rem;"><strong>Troubleshooting</strong> &mdash; if you see
+       <code>Error opening for writing ".../mambaf..."</code> while creating the
+       environment, libmamba is trying to write a temporary pip requirements file next
+       to the environment YAML. Use <code>./scripts/setup_env.sh</code> instead, or
+       ensure the directory containing <code>fridata_env_conda.yml</code> is writable.</p>
+    </div>
+  </details>
+
+  <details class="section">
+    <summary>Running on AFDB Structures Locally</summary>
+    <div class="section-body">
+    <p>Requires a directory of AFDB structures and a text file listing AFDB IDs (one
+       per line, <code>\n</code> delimited). Assumes the installation steps above succeeded.</p>
+    <pre><code>FRIDATA_PATH="&lt;repository path&gt;"
+AFDB_PATH="&lt;AFDB structures directory path&gt;"
+IDS_PATH="&lt;AFDB IDs file path&gt;"
+
+cd ${FRIDATA_PATH}
+
+EMBEDDER_TYPE=esm2_t33_650M_UR50D
+
+# (macOS only) fix for OpenMP multiple runtime error
+export KMP_DUPLICATE_LIB_OK=TRUE
+
+PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/fridata.py \
+  generate_data \
+  -t sequences,coordinates,distograms,embeddings \
+  -d AFDB \
+  -c subset \
+  --version test \
+  -i ${IDS_PATH} \
+  --input-path ${AFDB_PATH} \
+  -e ${EMBEDDER_TYPE}</code></pre>
+    <p>For subset runs with <code>--input-path</code>, new datasets store canonical keys
+       as <code>{line_from_ids_file}_{chain}</code> (for example <code>A0A2K6V5L6_A</code>),
+       not the full AlphaFold CIF filename stem. The dataset's
+       <code>input_structures.idx</code> maps each canonical key to the source structure
+       filename. Older datasets created before this convention may still use long
+       AF-style keys.</p>
+    </div>
+  </details>
+
+  <details class="section">
+    <summary>Running as a CLI Tool</summary>
+    <div class="section-body">
+    <p>From the <code>FRIdata</code> directory, install it as a CLI tool:</p>
+    <pre><code>python3 -m pip install -e .
+
+# now available as
+fridata &lt;...&gt;</code></pre>
+    <p>Use <code>ids_file</code> tokens (e.g. plain UniProt) plus chain as the canonical
+       dataset index keys.</p>
+    </div>
+  </details>
+
+  <details class="section">
+    <summary>Running on HPC (PLGrid / SLURM)</summary>
+    <div class="section-body">
+    <p>Running FRIdata on HPC differs between CPU and GPU nodes. These instructions are
+       valid for HPC hosted in PLGrid infrastructure; other infrastructures may require
+       additional adjustments.</p>
+
+    <p><strong>Prerequisites:</strong></p>
+    <ul>
+      <li>An active grant valid on the HPC</li>
+      <li>Loaded modules: <code>miniconda3</code> and <code>gcc</code></li>
+      <li>Mandatory environment variables (ideally set in <code>.bashrc</code>):
+        <ul>
+          <li><code>DEEPFRI_PATH</code> &mdash; parent directory of this repo</li>
+          <li><code>IDS_PATH</code> &mdash; text file with AFDB indexes listed</li>
+          <li><code>AFDB_PATH</code> &mdash; path to AFDB structures (may be an empty
+              directory &mdash; structures will be fetched there)</li>
+          <li><code>DATA_PATH</code> &mdash; parent directory of all generated output data</li>
+        </ul>
+      </li>
+      <li>Optional environment variables (with defaults):
+        <ul>
+          <li><code>COMMON_SLURM_PATH</code> &mdash; defaults to <code>$DEEPFRI_PATH/FRIdata/scripts/hpc/common_slurm.sh</code></li>
+          <li><code>LAUNCH_WORKER_SLURM_PATH</code> &mdash; defaults to <code>$DEEPFRI_PATH/FRIdata/scripts/hpc/launch_workers_slurm.sh</code></li>
+          <li><code>MEMORY_LIMIT</code> &mdash; memory limit per Dask worker, defaults to <code>288GiB</code></li>
+          <li><code>IP_INTERFACE</code> &mdash; network interface where Dask workers connect, defaults to <code>ens1f0</code></li>
+          <li><code>CONDA_ENV_PATH</code> &mdash; path to conda environment, defaults to <code>$DEEPFRI_PATH/conda_dev</code></li>
+        </ul>
+      </li>
+    </ul>
+
+    <p><strong>Preperation steps:</strong></p>
+    <pre><code># 1. Clone the repo
+git clone https://github.com/Tomasz-Lab/FRIdata.git
+cd FRIdata
+
+# 2. Update run permissions
+chmod u+x -R scripts/hpc/cpu
+
+# 3. Initialize SLURM (add --cpu when running on a CPU cluster)
+./scripts/hpc/initialize_slurm.sh &lt;path to .conda&gt; [--cpu]</code></pre>
+
+    <p>Then, schedule the sbatch script. Operations: <code>sequences</code>,
+       <code>coordinates</code>, <code>embeddings</code>, <code>distograms</code>.</p>
+    <pre><code># CPU nodes
+sbatch --cpus-per-task=&lt;cpus&gt; --time=&lt;HH:MM:SS&gt; --nodes=&lt;nodes&gt; \
+  --account=&lt;grant name&gt; scripts/hpc/run_slurm.sh sequences,coordinates
+
+# GPU nodes
+sbatch --gres=gpu[:gpu-number] --time=&lt;HH:MM:SS&gt; --account=&lt;grant name&gt; \
+  --nodes=1 --partition=&lt;partition name&gt; --cpus-per-task=&lt;cpus&gt; \
+  scripts/hpc/run_slurm.sh embeddings</code></pre>
+    </div>
+  </details>
+
+  <details class="section">
+    <summary>Available Parameters</summary>
+    <div class="section-body">
+
+    <p>FRIdata is organized into sub-commands. The most common is <code>generate_data</code>,
+       which creates a dataset and generates the requested data types in one run.</p>
+
+    <h3 style="font-size:1rem;color:#e6edf3;margin:1.2rem 0 0.5rem;">Sub-commands</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>generate_data</code></td><td>Create a dataset and generate sequences, coordinates, distograms and embeddings</td></tr>
+          <tr><td><code>create_dataset</code></td><td>Create a protein dataset only</td></tr>
+          <tr><td><code>generate_sequence</code></td><td>Generate sequences from a dataset</td></tr>
+          <tr><td><code>generate_distograms</code></td><td>Generate distograms from a dataset</td></tr>
+          <tr><td><code>generate_embeddings</code></td><td>Generate embeddings from a dataset</td></tr>
+          <tr><td><code>read_distograms</code></td><td>Read distograms from a dataset</td></tr>
+          <tr><td><code>read_pdbs</code></td><td>Read PDBs (print to terminal or extract with <code>--to_directory</code>)</td></tr>
+          <tr><td><code>verify_chains</code></td><td>Verify chains in a dataset</td></tr>
+          <tr><td><code>create_archive</code></td><td>Build one merged PDB <code>.zip</code> from the dataset index</td></tr>
+          <tr><td><code>create_dashboard</code></td><td>Export a single-file HTML report for dataset indexes</td></tr>
+          <tr><td><code>inspect_h5</code></td><td>Inspect an <code>.h5</code> file (tree, keys, structures, numeric dumps)</td></tr>
+          <tr><td><code>inspect_idx</code></td><td>Pretty-print an <code>.idx</code> (JSON) file</td></tr>
+          <tr><td><code>remove_dataset</code></td><td>Remove all traces of a dataset</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:1rem;color:#e6edf3;margin:1.6rem 0 0.5rem;">Dataset options</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Flag</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-p</code>, <code>--file-path</code></td><td>Existing dataset directory (with <code>dataset.json</code>) or path to <code>dataset.json</code></td></tr>
+          <tr><td><code>-d</code>, <code>--db</code></td><td>Database type (see choices below)</td></tr>
+          <tr><td><code>-c</code>, <code>--collection</code></td><td>Collection type (see choices below)</td></tr>
+          <tr><td><code>-t</code>, <code>--type</code></td><td>Comma-separated types to generate: <code>dataset</code>, <code>sequences</code>, <code>coordinates</code>, <code>distograms</code>, <code>embeddings</code>, or <code>all</code> (<code>generate_data</code> only)</td></tr>
+          <tr><td><code>-e</code>, <code>--embedder</code></td><td>Embedder type (see choices below)</td></tr>
+          <tr><td><code>-i</code>, <code>--ids</code></td><td>File with IDs used to create a subset</td></tr>
+          <tr><td><code>-s</code>, <code>--seqres</code></td><td>FASTA file to use as the sequence source</td></tr>
+          <tr><td><code>--input-path</code></td><td>Input directory or archive (zip/tar.gz) of protein files (pdb/cif)</td></tr>
+          <tr><td><code>--archive</code></td><td>Path to a tar.gz archive containing structure files</td></tr>
+          <tr><td><code>--proteome</code></td><td>Precise proteome of an AFDB <code>part</code> dataset</td></tr>
+          <tr><td><code>--version</code></td><td>String to differentiate datasets (default: current date)</td></tr>
+          <tr><td><code>-b</code>, <code>--batch-size</code></td><td>Batch size</td></tr>
+          <tr><td><code>-o</code>, <code>--overwrite</code></td><td>Overwrite existing files (default: false)</td></tr>
+          <tr><td><code>--binary</code></td><td>Download binary CIF in the PDB database</td></tr>
+          <tr><td><code>--slurm</code></td><td>Use the SLURM job scheduler</td></tr>
+          <tr><td><code>-v</code>, <code>--verbose</code></td><td>Enable verbose logging</td></tr>
+          <tr><td><code>--log-file</code></td><td>Path to a log file for file logging</td></tr>
+          <tr><td><code>--config</code></td><td>Path to a config JSON file (default: <code>./config.json</code>)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:1rem;color:#e6edf3;margin:1.6rem 0 0.5rem;">Choices</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Accepted values</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-d</code>, <code>--db</code></td><td><code>PDB</code>, <code>AFDB</code>, <code>ESMatlas</code>, <code>other</code></td></tr>
+          <tr><td><code>-c</code>, <code>--collection</code></td><td><code>all</code>, <code>clust</code>, <code>part</code>, <code>subset</code></td></tr>
+          <tr><td><code>-e</code>, <code>--embedder</code></td><td><code>esm2_t30_150M_UR50D</code>, <code>esm2_t33_650M_UR50D</code>, <code>esmc_300m</code>, <code>esmc_600m</code>, <code>gLM2_150M</code>, <code>gLM2_650M</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    </div>
+  </details>
+
+  <details class="section">
+    <summary>Example usage</summary>
+    <div class="section-body">
+    <p>Each sub-command below shows its <code>--help</code> output. Run
+       <code>fridata &lt;subcommand&gt; --help</code> to reproduce it.</p>
+
+    <details class="subcmd">
+      <summary>generate_data</summary>
+      <pre><code>usage: fridata generate_data [-h] [--slurm] [-p FILE_PATH] [-d name] [-c name]
+                             [-t [name]] [--proteome [name]]
+                             [--version VERSION] [-i IDS] [-s SEQRES] [-o]
+                             [-b BATCH_SIZE] [--binary]
+                             [--input-path INPUT_PATH] [--archive ARCHIVE]
+                             [-v] [-e name]
+
+options:
+  -h, --help            show this help message and exit
+  --slurm               Use SLURM job scheduler
+  -p FILE_PATH, --file-path FILE_PATH
+                        Existing dataset directory (with dataset.json) or path
+                        to dataset.json
+  -d name, --db name    Database Types: PDB AFDB ESMatlas other
+  -c name, --collection name
+                        Collection Types: all clust part subset
+  -t [name], --type [name]
+                        Comma-separated types to generate: dataset, sequences,
+                        coordinates, distograms, embeddings; or 'all'. For
+                        generate_data only; ignored by create_dataset.
+  --proteome [name]     Precise proteome of AFDB part dataset
+  --version VERSION     String to differentiate datasets; default: current
+                        date
+  -i IDS, --ids IDS     File with ids to create subset
+  -s SEQRES, --seqres SEQRES
+                        fasta file to use as sequence source
+  -o, --overwrite       Should overwrite existing files? Default - false
+  -b BATCH_SIZE, --batch-size BATCH_SIZE
+  --binary              Download binary CIF in PDB db
+  --input-path INPUT_PATH
+                        Path to input directory or archive (zip/tar.gz) with
+                        protein files (pdb/cif)
+  --archive ARCHIVE     Path to tar.gz archive containing structure files
+  -v, --verbose         Enable verbose logging mode
+  -e name, --embedder name
+                        Embedder Types: esm2_t30_150M_UR50D
+                        esm2_t33_650M_UR50D esmc_300m esmc_600m gLM2_150M
+                        gLM2_650M</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>create_dataset</summary>
+      <pre><code>usage: fridata create_dataset [-h] [--slurm] -d name -c name [-t [name]]
+                              [--proteome [name]] [--version VERSION] [-i IDS]
+                              [-s SEQRES] [-o] [-b BATCH_SIZE] [--binary]
+                              [--input-path INPUT_PATH] [--archive ARCHIVE]
+                              [-v] [-e name]
+
+options:
+  -h, --help            show this help message and exit
+  --slurm               Use SLURM job scheduler
+  -d name, --db name    Database Types: PDB AFDB ESMatlas other
+  -c name, --collection name
+                        Collection Types: all clust part subset
+  -t [name], --type [name]
+                        Comma-separated types to generate: dataset, sequences,
+                        coordinates, distograms, embeddings; or 'all'. For
+                        generate_data only; ignored by create_dataset.
+  --proteome [name]     Precise proteome of AFDB part dataset
+  --version VERSION     String to differentiate datasets; default: current
+                        date
+  -i IDS, --ids IDS     File with ids to create subset
+  -s SEQRES, --seqres SEQRES
+                        fasta file to use as sequence source
+  -o, --overwrite       Should overwrite existing files? Default - false
+  -b BATCH_SIZE, --batch-size BATCH_SIZE
+  --binary              Download binary CIF in PDB db
+  --input-path INPUT_PATH
+                        Path to input directory or archive (zip/tar.gz) with
+                        protein files (pdb/cif)
+  --archive ARCHIVE     Path to tar.gz archive containing structure files
+  -v, --verbose         Enable verbose logging mode
+  -e name, --embedder name
+                        Embedder Types: esm2_t30_150M_UR50D
+                        esm2_t33_650M_UR50D esmc_300m esmc_600m gLM2_150M
+                        gLM2_650M</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>generate_sequence</summary>
+      <pre><code>usage: fridata generate_sequence [-h] [--slurm] -p FILE_PATH [-v]
+                                 [--log-file LOG_FILE] [--ca_mask]
+                                 [--no_substitution]
+
+options:
+  -h, --help            show this help message and exit
+  --slurm               Use SLURM job scheduler
+  -p FILE_PATH, --file-path FILE_PATH
+  -v, --verbose         Enable verbose logging
+  --log-file LOG_FILE   Path to log file for file logging
+  --ca_mask             Require a carbon alpha atom to include an amino acid
+                        in a sequence
+  --no_substitution     Don't substitute non standard amino acids</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>generate_distograms</summary>
+      <pre><code>usage: fridata generate_distograms [-h] [--slurm] -p FILE_PATH [-v]
+                                   [--log-file LOG_FILE]
+
+options:
+  -h, --help            show this help message and exit
+  --slurm               Use SLURM job scheduler
+  -p FILE_PATH, --file-path FILE_PATH
+  -v, --verbose         Enable verbose logging
+  --log-file LOG_FILE   Path to log file for file logging</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>generate_embeddings</summary>
+      <pre><code>usage: fridata generate_embeddings [-h] [--slurm] -p FILE_PATH [-v]
+                                   [--log-file LOG_FILE] -e name
+
+options:
+  -h, --help            show this help message and exit
+  --slurm               Use SLURM job scheduler
+  -p FILE_PATH, --file-path FILE_PATH
+  -v, --verbose         Enable verbose logging
+  --log-file LOG_FILE   Path to log file for file logging
+  -e name, --embedder name
+                        Embedder Types: esm2_t30_150M_UR50D
+                        esm2_t33_650M_UR50D esmc_300m esmc_600m gLM2_150M
+                        gLM2_650M</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>read_distograms</summary>
+      <pre><code>usage: fridata read_distograms [-h] [--slurm] -p FILE_PATH [-v]
+                               [--log-file LOG_FILE]
+
+options:
+  -h, --help            show this help message and exit
+  --slurm               Use SLURM job scheduler
+  -p FILE_PATH, --file-path FILE_PATH
+  -v, --verbose         Enable verbose logging
+  --log-file LOG_FILE   Path to log file for file logging</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>read_pdbs</summary>
+      <pre><code>usage: fridata read_pdbs [-h] [--print] [--to_directory TO_DIRECTORY] [-i IDS]
+                         [--slurm] -p FILE_PATH [-v] [--log-file LOG_FILE]
+
+options:
+  -h, --help            show this help message and exit
+  --print               Print PDB files to the terminal
+  --to_directory TO_DIRECTORY
+                        Extract PDB files to the provided directory
+  -i IDS, --ids IDS     File with ids to extract
+  --slurm               Use SLURM job scheduler
+  -p FILE_PATH, --file-path FILE_PATH
+  -v, --verbose         Enable verbose logging
+  --log-file LOG_FILE   Path to log file for file logging</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>verify_chains</summary>
+      <pre><code>usage: fridata verify_chains [-h] [--slurm] -p FILE_PATH [-v]
+                             [--log-file LOG_FILE]
+
+options:
+  -h, --help            show this help message and exit
+  --slurm               Use SLURM job scheduler
+  -p FILE_PATH, --file-path FILE_PATH
+  -v, --verbose         Enable verbose logging
+  --log-file LOG_FILE   Path to log file for file logging</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>create_archive</summary>
+      <pre><code>usage: fridata create_archive [-h] [--keep-shard-zips] [--slurm] -p FILE_PATH
+                              [-v] [--log-file LOG_FILE]
+
+options:
+  -h, --help            show this help message and exit
+  --keep-shard-zips     Keep per-shard zip files under _staging/ after merge
+                        (default: remove staging)
+  --slurm               Use SLURM job scheduler
+  -p FILE_PATH, --file-path FILE_PATH
+  -v, --verbose         Enable verbose logging
+  --log-file LOG_FILE   Path to log file for file logging
+
+Working directory: a `mate` helper (if you use it) often cd's into deepFRI2-toolbox-dev; after that, pass an absolute -p/--file-path to the dataset directory (the folder containing dataset.json), or cd to &lt;data_path&gt;/datasets first if you want to use a short folder name.
+Invocation: run `python fridata.py create_archive ...` from the repo unless fridata.py is installed on PATH.</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>create_dashboard</summary>
+      <pre><code>usage: fridata create_dashboard [-h] [--root ROOT] [--index-types INDEX_TYPES]
+                                [--output-dir OUTPUT_DIR]
+                                dataset
+
+positional arguments:
+  dataset               Dataset: filesystem path (directory or dataset.json),
+                        slug (folder suffix after --), or full folder name
+                        under --root when not an existing path
+
+options:
+  -h, --help            show this help message and exit
+  --root ROOT           Override datasets root (default: &lt;data_path&gt;/datasets)
+  --index-types INDEX_TYPES
+                        Comma-separated index types
+                        (dataset,sequences,coordinates,embeddings,distograms)
+                        or 'all'
+  --output-dir OUTPUT_DIR
+                        Output directory for reports (default:
+                        &lt;repo_root&gt;/reports)</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>inspect_h5</summary>
+      <pre><code>usage: fridata inspect_h5 [-h]
+                          [--mode {preview,structures,keys,distograms,coordinates,embeddings}]
+                          [--name KEYS] [--save [FILEPATH]]
+                          file
+
+positional arguments:
+  file                  Path to h5 file
+
+options:
+  -h, --help            show this help message and exit
+  --mode {preview,structures,keys,distograms,coordinates,embeddings}
+                        preview: H5 tree; keys: id list; structures: full PDB
+                        text (files group); distograms|coordinates|embeddings:
+                        numeric preview (or full dump with --name)
+  --name KEYS           Comma-separated protein keys. Only with --mode
+                        structures|distograms|coordinates|embeddings. For
+                        numeric modes, emits a full array dump. Use inspect_h5
+                        --mode keys to list keys.
+  --save [FILEPATH]     Write output to a file instead of vi. Omit FILEPATH to
+                        write a persistent temp file and print its path.</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>inspect_idx</summary>
+      <pre><code>usage: fridata inspect_idx [-h] file
+
+positional arguments:
+  file        Path to idx file
+
+options:
+  -h, --help  show this help message and exit</code></pre>
+    </details>
+
+    <details class="subcmd">
+      <summary>remove_dataset</summary>
+      <pre><code>usage: fridata remove_dataset [-h] name
+
+positional arguments:
+  name        Dataset name (e.g. AFDB-subset--20250609_1333)
+
+options:
+  -h, --help  show this help message and exit</code></pre>
+    </details>
+    </div>
+  </details>
+
+</main>
+
+<footer>
+  FRIdata &mdash; <a href="https://github.com/Tomasz-Lab/FRIdata/blob/main/LICENSE">BSD-3-Clause License</a>
+  &mdash; <a href="https://github.com/Tomasz-Lab">Tomasz-Lab</a>
+</footer>
+
+</body>
+</html>
