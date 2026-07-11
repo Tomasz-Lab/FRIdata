@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-FRIdata-blue?style=flat-square)](https://tomasz-lab.github.io/FRIdata/)
-[![GitHub](https://img.shields.io/badge/GitHub-Tomasz--Lab%2FFRIdata-181717?style=flat-square&logo=github)](https://github.com/Tomasz-Lab/FRIdata/)
+[![GitHub](https://img.shields.io/badge/source-GitHub-303030.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/)
 [![Python](https://img.shields.io/badge/python-3.10-blue.svg?style=flat-square&logo=python)](https://www.python.org/)
 [![Dask](https://img.shields.io/badge/impl-Dask-blue?style=flat-square)](https://docs.dask.org/en/stable/)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg?style=flat-square)](https://opensource.org/licenses/BSD-3-Clause)
@@ -18,7 +18,11 @@ Leveraging Dask, it is highly efficient and scalable
 
 In [deepFRI2](https://github.com/Tomasz-Lab/deepFRI2) training, we use FRIdata to manage different releases of the Gene Ontology Annotation (GOA) database, stratified by annotation quality.
 
+Full documentation may be found [here](https://tomasz-lab.github.io/FRIdata/).
+
 The repository is currently under active development. If you run into installation problems, find a bug, or would like to propose an improvement, please raise an issue or write directly to p.szczerbiak[at]sanoscience.org.
+
+![FRIdata pipeline](diagram.png)
 
 ## Installation and activation
 
@@ -94,31 +98,7 @@ If you see `Error opening for writing ".../mambaf..."` while creating the enviro
 pytest ./tests
 ```
 
-## Running as a CLI tool
-
-Assuming all `Installation and activation` steps succeeded.
-
-0. Go into `FRIdata` directory
-
-```
-cd <path into FRIdata>
-```
-
-1. Install as a CLI tool
-
-```
-python3 -m pip install -e .
-```
-
-2. Now FRIdata can be run as a CLI tool
-
-```
-fridata <...>
-```
-
-(Use ids_file tokens (e.g. plain UniProt) plus chain as the canonical dataset index keys)
-
-## Example usage
+## Usage examples
 
 ### Running on AFDB structures locally
 
@@ -149,7 +129,31 @@ PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/fridata.py \
 
 For subset runs with `--input-path`, new datasets store canonical keys as `{line_from_ids_file}_{chain}` (for example `A0A2K6V5L6_A`), not the full AlphaFold CIF filename stem. The dataset’s `input_structures.idx` maps each canonical key to the source structure filename. Older datasets created before this convention may still use long AF-style keys.
 
-## Running on HPC
+### Running as a CLI tool
+
+Assuming all `Installation and activation` steps succeeded.
+
+0. Go into `FRIdata` directory
+
+```
+cd <path into FRIdata>
+```
+
+1. Install as a CLI tool
+
+```
+python3 -m pip install -e .
+```
+
+2. Now FRIdata can be run as a CLI tool
+
+```
+fridata <...>
+```
+
+(Use ids_file tokens (e.g. plain UniProt) plus chain as the canonical dataset index keys)
+
+### Running on HPC
 
 Running FRIdata on HPC differs on CPU and GPU nodes. This instruction set is valid for HPC hosted in PLGrid infrastructure. Running on other infrastructures may require additional adjustments.
 
