@@ -1,11 +1,12 @@
 # FRIdata
 
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg?style=flat-square)](https://opensource.org/licenses/BSD-3-Clause)
+[![CI](https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-FRIdata-blue?style=flat-square)](https://tomasz-lab.github.io/FRIdata/)
+[![GitHub](https://img.shields.io/badge/GitHub-Tomasz--Lab%2FFRIdata-181717?style=flat-square&logo=github)](https://github.com/Tomasz-Lab/FRIdata/)
 [![Python](https://img.shields.io/badge/python-3.10-blue.svg?style=flat-square&logo=python)](https://www.python.org/)
-[![CI](https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml/badge.svg)](https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml)
-[![Implements Dask](https://img.shields.io/badge/impl-Dask-blue)](https://docs.dask.org/en/stable/)
-[![Source](https://img.shields.io/badge/source-GitHub-303030.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/)
-[![GitHub issues](https://img.shields.io/github/issues/Tomasz-Lab/FRIdata.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/issues)
+[![Dask](https://img.shields.io/badge/impl-Dask-blue?style=flat-square)](https://docs.dask.org/en/stable/)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg?style=flat-square)](https://opensource.org/licenses/BSD-3-Clause)
+[![Issues](https://img.shields.io/github/issues/Tomasz-Lab/FRIdata.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/issues)
 
 Imagine regularly downloading new releases of protein databases (PDB, UniProt, AFDB, ESMAtlas, etc.) and having to process them efficiently while avoiding redundant computations. It's a surprisingly frustrating problem.
 
@@ -87,13 +88,39 @@ Pip dependencies live in `requirements-fridata.txt` instead of `fridata_env_cond
 
 If you see `Error opening for writing ".../mambaf..."` while creating the environment, libmamba is trying to write a temporary pip requirements file next to the environment YAML. Use `./scripts/setup_env.sh` instead, or ensure the directory containing `fridata_env_conda.yml` is writable.
 
-## Running tests
+### Running tests
 
 ```
 pytest ./tests
 ```
 
-## Running on AFDB structures locally
+## Running as a CLI tool
+
+Assuming all `Installation and activation` steps succeeded.
+
+0. Go into `FRIdata` directory
+
+```
+cd <path into FRIdata>
+```
+
+1. Install as a CLI tool
+
+```
+python3 -m pip install -e .
+```
+
+2. Now FRIdata can be run as a CLI tool
+
+```
+fridata <...>
+```
+
+(Use ids_file tokens (e.g. plain UniProt) plus chain as the canonical dataset index keys)
+
+## Example usage
+
+### Running on AFDB structures locally
 
 Requires having a directory with AFDB structures and a text file containing list of AFDB IDs with `\n` delimeter. Assuming all steps from `Installation and activation` succeded
 
@@ -121,30 +148,6 @@ PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/fridata.py \
 ```
 
 For subset runs with `--input-path`, new datasets store canonical keys as `{line_from_ids_file}_{chain}` (for example `A0A2K6V5L6_A`), not the full AlphaFold CIF filename stem. The dataset’s `input_structures.idx` maps each canonical key to the source structure filename. Older datasets created before this convention may still use long AF-style keys.
-
-## Running as a CLI tool
-
-Assuming all `Installation and activation` steps succeeded.
-
-0. Go into `FRIdata` directory
-
-```
-cd <path into FRIdata>
-```
-
-1. Install as a CLI tool
-
-```
-python3 -m pip install -e .
-```
-
-2. Now FRIdata can be run as a CLI tool
-
-```
-fridata <...>
-```
-
-(Use ids_file tokens (e.g. plain UniProt) plus chain as the canonical dataset index keys)
 
 ## Running on HPC
 
