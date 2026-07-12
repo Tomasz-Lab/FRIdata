@@ -5,7 +5,7 @@
 [![GitHub](https://img.shields.io/badge/source-GitHub-303030.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/)
 [![Python](https://img.shields.io/badge/python-3.10-blue.svg?style=flat-square&logo=python)](https://www.python.org/)
 [![Dask](https://img.shields.io/badge/impl-Dask-blue?style=flat-square)](https://docs.dask.org/en/stable/)
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg?style=flat-square)](https://opensource.org/licenses/BSD-3-Clause)
+[![License](https://img.shields.io/github/license/Tomasz-Lab/FRIdata?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/blob/main/LICENSE)
 [![Issues](https://img.shields.io/github/issues/Tomasz-Lab/FRIdata.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/issues)
 
 Imagine regularly downloading new releases of protein databases (PDB, UniProt, AFDB, ESMAtlas, etc.) and having to process them efficiently while avoiding redundant computations. It's a surprisingly frustrating problem.
