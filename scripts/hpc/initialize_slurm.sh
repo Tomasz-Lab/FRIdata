@@ -1,16 +1,16 @@
 #!/bin/bash
-# Installation script for toolbox environment
-# Usage: ./install.sh <GROUP_DIR> [--cpu]
+# Installation script for the FRIdata HPC environment (venv + pip).
+# Usage: ./initialize_slurm.sh [--cpu]
 #   --cpu: Install CPU-only PyTorch (for CI or non-GPU systems)
-#   Default: Install GPU-enabled PyTorch
+#   Default: Install GPU-enabled PyTorch matched to the node's CUDA driver
+#
+# Environment variables:
+#   DEEPFRI_PATH  (required) parent directory of the FRIdata repo
+#   VENV_PATH     (optional) virtualenv location, defaults to $DEEPFRI_PATH/.venv
 
 set -e
 
-GROUP_DIR=$1
 CPU_ONLY=false
-
-# Parse optional flags
-shift
 for arg in "$@"; do
     case $arg in
         --cpu)
@@ -19,69 +19,64 @@ for arg in "$@"; do
     esac
 done
 
-if [ -z "$GROUP_DIR" ]; then
-    echo "Usage: ./install.sh <GROUP_DIR> [--cpu]"
-    exit 1
-fi
-
 # Check if DEEPFRI_PATH is set, if not then throw an error
 if [[ ! -v DEEPFRI_PATH ]]; then
     echo "Error: DEEPFRI_PATH environment variable is not set."
     exit 1
 fi
 
-# Check if CONDA_ENV_PATH is set, if not then set a default path
-if [[ ! -v CONDA_ENV_PATH ]]; then
-    CONDA_ENV_PATH="$DEEPFRI_PATH/conda_dev"
+# Virtualenv location (mirrors common_slurm.sh).
+if [[ ! -v VENV_PATH ]]; then
+    VENV_PATH="$DEEPFRI_PATH/.venv"
 fi
 
-CONDA_DIR="$GROUP_DIR/.conda"
-
-# Try loading a Conda/Miniconda module in a robust way (handle varied names)
-LOADED_MODULE=false
+# Try loading GCC and a Python module in a robust way (handle varied names).
+LOADED_GCC=false
+LOADED_PYTHON=false
 if command -v module >/dev/null 2>&1; then
-    MODULE_CANDIDATES=(miniconda3 Miniconda3 miniconda Anaconda3 anaconda3)
-    for MOD in "${MODULE_CANDIDATES[@]}"; do
+    GCC_CANDIDATES=(gcc GCC)
+    for MOD in "${GCC_CANDIDATES[@]}"; do
         if module load "$MOD" >/dev/null 2>&1; then
             echo "Loaded module: $MOD"
-            LOADED_MODULE=true
+            LOADED_GCC=true
+            break
+        fi
+    done
+
+    # Cluster-specific: adjust these names to match `module avail python`.
+    PYTHON_CANDIDATES=(python Python python3 Python3)
+    for MOD in "${PYTHON_CANDIDATES[@]}"; do
+        if module load "$MOD" >/dev/null 2>&1; then
+            echo "Loaded module: $MOD"
+            LOADED_PYTHON=true
             break
         fi
     done
 fi
 
-if [ "$LOADED_MODULE" = false ]; then
-    echo "Error: Could not load a Conda module."
+if [ "$LOADED_PYTHON" = false ]; then
+    echo "Error: Could not load a Python module."
     exit 1
 fi
 
-conda config --add pkgs_dirs "$CONDA_DIR"
+# Create the virtualenv.
+echo "Creating virtualenv at '$VENV_PATH'..."
+python -m venv "$VENV_PATH"
+source "$VENV_PATH/bin/activate"
 
-# Create environment from base YAML (without PyTorch or pip-only deps)
-ENV_WORKDIR="$(mktemp -d)"
-trap 'rm -rf "$ENV_WORKDIR"' EXIT
-cp "$DEEPFRI_PATH/FRIdata/fridata_env_conda.yml" "$ENV_WORKDIR/fridata_env_conda.yml"
-conda env create --prefix $CONDA_ENV_PATH --file "$ENV_WORKDIR/fridata_env_conda.yml"
+python -m pip install --upgrade pip
 
-conda config --set auto_activate_base false
+echo "Installing FRIdata core dependencies..."
+pip install -e "$DEEPFRI_PATH/FRIdata"
 
-eval "$(conda shell.bash hook)"
-conda activate $CONDA_ENV_PATH
-
-echo "Installing pip requirements..."
-pip install -r "$DEEPFRI_PATH/FRIdata/requirements-fridata.txt"
-
-# Install PyTorch based on mode
+# Install PyTorch/ESM matched to the node (GPU by default, CPU with --cpu).
+PYTORCH_ARGS=()
 if [ "$CPU_ONLY" = true ]; then
     echo "Installing CPU-only PyTorch..."
-    conda install -y pytorch cpuonly -c pytorch
+    PYTORCH_ARGS+=(--cpu)
 else
     echo "Installing GPU-enabled PyTorch..."
-    conda install -y pytorch-gpu
 fi
-
-# Install ESM (requires PyTorch to be installed first)
-echo "Installing ESM..."
-pip install esm
+PYTHON="$VENV_PATH/bin/python" bash "$DEEPFRI_PATH/FRIdata/scripts/install_pytorch.sh" "${PYTORCH_ARGS[@]}"
 
 echo "Installation complete!"

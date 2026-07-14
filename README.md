@@ -22,75 +22,91 @@ Full documentation may be found [here](https://tomasz-lab.github.io/FRIdata/).
 
 The repository is currently under active development. If you run into installation problems, find a bug, or would like to propose an improvement, please raise an issue or write directly to p.szczerbiak[at]sanoscience.org.
 
-![FRIdata pipeline](diagram.png)
+![FRIdata pipeline](https://raw.githubusercontent.com/Tomasz-Lab/FRIdata/main/diagram.png)
 
-## Installation and activation
+Generate sequences, coordinates, distograms, and embeddings from protein structures at scale. Supports PDB, AFDB, ESMatlas, and local/custom inputs. Full API reference: [docs/index.html](docs/index.html).
 
-1. Download the repo
+## How FRIdata works
+
+Every dataset is defined by a **database type** (`-d`, `--db`) and a **collection type** (`-c`, `--collection`), plus optional `--proteome` and `--version`. Together they determine the dataset name (for example `AFDB-subset--test`) and how structures are resolved.
+
+Use `-t` / `--type` to choose what to generate in a run: `sequences`, `coordinates`, `distograms`, `embeddings`, or `all`.
+
+### Database type (`-d`, `--db`)
+
+Where structures come from.
+
+| Value | Meaning |
+|-------|---------|
+| `PDB` | RCSB PDB structures (download by ID) |
+| `AFDB` | AlphaFold Database |
+| `ESMatlas` | ESM Atlas |
+| `other` | Local or custom files via `--input-path` or archives |
+
+### Collection type (`-c`, `--collection`)
+
+How much of that source to include.
+
+| Value | Meaning |
+|-------|---------|
+| `all` | Full database collection |
+| `part` | AFDB proteome partition (requires `--proteome`; foldcomp-based) |
+| `clust` | AFDB cluster partition (requires `--proteome`; foldcomp-based) |
+| `subset` | User-defined ID list via `-i` / `--ids` (optionally `--input-path` for local structures) |
+
+## Installation
+
+FRIdata is a pure-pip project (Python >= 3.10). No conda/mamba required.
+
+The core install covers `sequences`, `coordinates` and `distograms`. Embedding
+generation needs the heavier `torch`/`esm`/`transformers` stack, which lives in
+an optional `embeddings` extra so the default install stays small.
+
+### Quick start (recommended)
+
+The setup script creates a virtualenv, installs FRIdata with its dev extras, and
+installs a PyTorch build matched to your GPU driver:
 
 ```
 git clone https://github.com/Tomasz-Lab/FRIdata.git
 cd FRIdata
+./scripts/setup_env.sh            # GPU (auto-detected); use --cpu for CPU-only
+source .venv/bin/activate
 ```
 
-2. [Install miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install)
-
-3. Install mamba
-
-```
-## prioritize 'conda-forge' channel
-conda config --add channels conda-forge
-
-## update existing packages to use 'conda-forge' channel
-conda update -n base --all
-
-## install 'mamba'
-conda install -n base mamba
-```
-
-4. Create the environment (recommended)
-
-Use the setup script to create the conda environment, install pip dependencies, and install a PyTorch build matched to your GPU driver:
-
-```
-./scripts/setup_env.sh
-```
-
-Use a custom environment name for a separate install:
-
-```
-./scripts/setup_env.sh -n fridata_gpu_verify
-```
-
-For CPU-only systems:
-
-```
-./scripts/setup_env.sh --cpu
-```
-
-5. Activate the environment
-
-```
-# Choose your shell type. Could be one of these: {bash,cmd.exe,dash,fish,nu,posix,powershell,tcsh,xonsh,zsh}
-eval "$(mamba shell hook --shell <replace with shell type>)"
-mamba activate fridata_env
-```
+Options: `--cpu` (CPU-only PyTorch), `--skip-pytorch` (core install, no
+embeddings), `-p/--path DIR` (virtualenv location, default `.venv`).
 
 ### Manual installation
 
-If you prefer to run the steps yourself:
+```
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+
+# Core only (sequences / coordinates / distograms):
+pip install -e .
+
+# ...or with embedding support (torch/esm/transformers from PyPI):
+pip install -e ".[embeddings]"
+```
+
+On Linux the default PyPI `torch` wheel is CUDA-enabled. For a specific CUDA
+version or CPU-only wheels, use the helper after installing:
 
 ```
-mamba env create -f fridata_env_conda.yml -n fridata_env
-mamba run -n fridata_env python -m pip install -r requirements-fridata.txt
-./scripts/install_pytorch.sh
+./scripts/install_pytorch.sh          # auto-detect CUDA from the driver
+./scripts/install_pytorch.sh --cpu    # force CPU-only build
 ```
 
-Pip dependencies live in `requirements-fridata.txt` instead of `fridata_env_conda.yml` so environment creation works from read-only repository checkouts.
+### Install from PyPI
 
-### Troubleshooting
+Once released, FRIdata can be installed without cloning the repo:
 
-If you see `Error opening for writing ".../mambaf..."` while creating the environment, libmamba is trying to write a temporary pip requirements file next to the environment YAML. Use `./scripts/setup_env.sh` instead, or ensure the directory containing `fridata_env_conda.yml` is writable.
+```
+pip install fridata                 # core
+pip install "fridata[embeddings]"   # with embedding support
+```
 
 ### Running tests
 
@@ -102,7 +118,7 @@ pytest ./tests
 
 ### Running on AFDB structures locally
 
-Requires having a directory with AFDB structures and a text file containing list of AFDB IDs with `\n` delimeter. Assuming all steps from `Installation and activation` succeded
+Requires having a directory with AFDB structures and a text file containing list of AFDB IDs with `\n` delimeter. Assuming all steps from [Installation](#installation) succeeded
 
 ```
 FRIDATA_PATH="<repository path>"
@@ -131,7 +147,7 @@ For subset runs with `--input-path`, new datasets store canonical keys as `{line
 
 ### Running as a CLI tool
 
-Assuming all `Installation and activation` steps succeeded.
+Assuming all [Installation](#installation) steps succeeded.
 
 0. Go into `FRIdata` directory
 
@@ -169,8 +185,8 @@ Prerequisites:
         - `LAUNCH_WORKER_SLURM_PATH`: path to launch_worker_slurm.sh, defaults to `$DEEPFRI_PATH/FRIdata/scripts/hpc/launch_workers_slurm.sh`
         - `MEMORY_LIMIT`: memory limit per Dask worker, defaults to `288GiB`
         - `IP_INTERFACE`: network unix interface, where dask workers are connected. Defaults to `ens1f0`
-        - `CONDA_ENV_PATH`: path to conda environment, defaults to `$DEEPFRI_PATH/conda_dev`
-- Have installed module miniconda3
+        - `VENV_PATH`: path to the FRIdata virtualenv, defaults to `$DEEPFRI_PATH/.venv`
+- Have a Python module available (`module avail python` — the scripts try `python`/`python3`; adjust the candidate list in `scripts/hpc/*.sh` if your cluster names it differently)
 - Have installed module gcc
 
 Steps:
@@ -188,10 +204,10 @@ cd FRIdata
 chmod u+x -R scripts/hpc/cpu
 ```
 
-3. Run `initialize_slurm.sh`. As an argument put the path into directory, where `.conda` directory should be installed and specify `--cpu` flag if the script is run on CPU cluster.
+3. Run `initialize_slurm.sh` to create the virtualenv (at `VENV_PATH`, default `$DEEPFRI_PATH/.venv`) and install dependencies. Add the `--cpu` flag on CPU clusters.
 
 ```
-./scripts/hpc/initialize_slurm.sh <path to .conda> [--cpu]
+./scripts/hpc/initialize_slurm.sh [--cpu]
 ```
 
 4. Schedule sbatch script into the HPC with all the args specified. Operations to be chosen are: `sequences`, `coordinates`, `embeddings`

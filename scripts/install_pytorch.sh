@@ -15,8 +15,16 @@
 # Usage: ./install_pytorch.sh [--cpu] [--dry-run]
 #   --cpu      Force the CPU-only PyTorch build (skip GPU detection)
 #   --dry-run  Print what would be installed without installing anything
+#
+# Set the PYTHON environment variable to target a specific interpreter (for
+# example a virtualenv's python) without activating it first:
+#   PYTHON=.venv/bin/python ./install_pytorch.sh
 
 set -euo pipefail
+
+# Interpreter to install into. Defaults to whatever 'python' is on PATH so an
+# activated venv/conda environment is picked up automatically.
+PYTHON="${PYTHON:-python}"
 
 # PyTorch wheel CUDA versions, ascending. Update as new wheels are released.
 # https://pytorch.org/get-started/locally/ and https://download.pytorch.org/whl/
@@ -40,21 +48,14 @@ for arg in "$@"; do
     esac
 done
 
-# --- Verify an environment is active ------------------------------------------
-if ! command -v python >/dev/null 2>&1; then
-    echo "Error: no 'python' found on PATH. Activate your conda/venv first." >&2
+# --- Verify the target interpreter exists -------------------------------------
+if ! "$PYTHON" -c 'import sys' >/dev/null 2>&1; then
+    echo "Error: '$PYTHON' is not a usable Python interpreter." >&2
+    echo "       Activate a venv first, or set PYTHON=/path/to/venv/bin/python." >&2
     exit 1
 fi
 
-if [ -n "${CONDA_PREFIX:-}" ]; then
-    echo "Target environment: $CONDA_PREFIX"
-    if [ "$(basename "$CONDA_PREFIX")" = "base" ]; then
-        echo "Warning: the conda 'base' environment is active. It is strongly" >&2
-        echo "         recommended to activate a dedicated environment first." >&2
-    fi
-else
-    echo "Warning: CONDA_PREFIX is not set; installing into '$(command -v python)'." >&2
-fi
+echo "Target interpreter: $("$PYTHON" -c 'import sys; print(sys.executable)')"
 
 # Turn a X.Y version into a comparable integer, e.g. 12.4 -> 1204.
 cuda_to_int() {
@@ -112,11 +113,11 @@ else
     INDEX_URL="https://download.pytorch.org/whl/${CUDA_TAG}"
 fi
 
-PIP_CMD=(python -m pip install torch torchvision torchaudio --index-url "$INDEX_URL")
+PIP_CMD=("$PYTHON" -m pip install torch torchvision torchaudio --index-url "$INDEX_URL")
 
 echo
 echo "Will run: ${PIP_CMD[*]}"
-echo "Then:     python -m pip install esm"
+echo "Then:     $PYTHON -m pip install esm"
 
 if [ "$DRY_RUN" = true ]; then
     echo "(--dry-run: nothing installed)"
@@ -129,11 +130,11 @@ echo "Installing PyTorch..."
 
 # ESM requires PyTorch to be installed first.
 echo "Installing ESM..."
-python -m pip install esm
+"$PYTHON" -m pip install esm
 
 # --- Verify the installation --------------------------------------------------
 echo "Verifying PyTorch installation..."
-python - <<'PY'
+"$PYTHON" - <<'PY'
 import torch
 print(f"torch {torch.__version__}")
 if torch.cuda.is_available():

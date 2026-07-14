@@ -6,74 +6,27 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash -el {0}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Generate cache key
-        id: cache-key
-        run: |
-          # Create a hash from the environment files and PyTorch CPU install string
-          ENV_HASH=$(cat fridata_env_conda.yml requirements-fridata.txt | sha256sum | cut -d' ' -f1)
-          PYTORCH_SPEC="pip-torch-torchvision-cpu-whl"
-          CACHE_KEY="micromamba-${{ runner.os }}-${ENV_HASH}-${PYTORCH_SPEC}"
-          echo "key=${CACHE_KEY}" >> $GITHUB_OUTPUT
-
-      - name: Restore micromamba environment cache
-        id: cache-restore
-        uses: actions/cache/restore@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          path: |
-            ~/micromamba/envs
-            ~/micromamba-bin
-          key: ${{ steps.cache-key.outputs.key }}
+          python-version: ${{ matrix.python-version }}
+          cache: pip
 
-      - name: Setup micromamba (cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        uses: mamba-org/setup-micromamba@v2
-        with:
-          environment-file: fridata_env_conda.yml
-          environment-name: fridata_env
-          cache-environment: false
-          cache-downloads: false
-          micromamba-binary-path: ~/micromamba-bin/micromamba
-          micromamba-root-path: ~/micromamba
-          init-shell: bash
+      - name: Install CPU-only PyTorch
+        # CPU wheels keep CI fast and avoid pulling multi-GB CUDA builds.
+        run: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
-      - name: Initialize micromamba from cache (cache hit)
-        if: steps.cache-restore.outputs.cache-hit == 'true'
-        run: |
-          # Make micromamba available to subsequent steps without shell hooks
-          echo "$HOME/micromamba-bin" >> "$GITHUB_PATH"
-          echo "MAMBA_ROOT_PREFIX=$HOME/micromamba" >> "$GITHUB_ENV"
-
-      - name: Install pip requirements and CPU-only PyTorch
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: |
-          # Pip packages are installed separately so read-only checkouts and CI caches stay reliable.
-          ~/micromamba-bin/micromamba run -n fridata_env python -m pip install --upgrade pip
-          ~/micromamba-bin/micromamba run -n fridata_env python -m pip install -r requirements-fridata.txt
-          # Avoid a second micromamba/libmamba solve mixing pytorch + conda-forge on an
-          # already-large env (can abort with libsolv solver_addrule assertion, exit 134).
-          # CPU wheels from PyTorch are the usual CI approach. Install torchvision from the
-          # same index as torch so C++/dispatch ops (e.g. torchvision::nms) match conda-forge
-          # transformers alone pulls torchvision that can mismatch a pip-only torch build.
-          ~/micromamba-bin/micromamba run -n fridata_env python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-          ~/micromamba-bin/micromamba run -n fridata_env python -m pip install esm
-
-      - name: Save micromamba environment cache
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/micromamba/envs
-            ~/micromamba-bin
-          key: ${{ steps.cache-key.outputs.key }}
+      - name: Install FRIdata with embeddings + test extras
+        run: pip install -e ".[embeddings,test]"
 
       - name: Run tests
-        run: |
-          ~/micromamba-bin/micromamba run -n fridata_env pytest ./tests
+        run: pytest ./tests

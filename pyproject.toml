@@ -5,8 +5,23 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "FRIdata"
 version = "0.1.0"
+description = "Generate sequences, coordinates, distograms, and embeddings from protein structures at scale."
 readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "Tomasz Lab" }]
+keywords = ["bioinformatics", "protein-structure", "dask", "dataset"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+]
+
+# Core dependencies. Everything needed for sequences, coordinates and distograms.
+# Heavy ML dependencies (torch/esm/transformers) live in the [embeddings] extra so a
+# default install stays lightweight — see optional-dependencies below.
 dependencies = [
     "foldcomp",
     "pydantic>=2.8.2",
@@ -16,24 +31,40 @@ dependencies = [
     "biotite>=0.41.2",
     "numpy>=1.26.4,<1.27.0",
     "genson",
-    "bs4",
-    "bio~=1.7.0",
-    "pytest",
-    "pytest-order",
+    "beautifulsoup4",
+    "biopython",
     "dask>=2024.4.2,<2025.0.0",
     "dask[dataframe]",
     "distributed>=2024.4.2,<2025.0.0",
     "python-dotenv",
     "tables",
-    "biopython",
     "bokeh>=2.4.2,<3.0.0",
-    "pdbfixer",
-    "mamba",
-    "transformers",
     "tqdm",
-    "torch",
-    "esm"
 ]
+
+[project.optional-dependencies]
+# Embedding generation. Installs torch/esm/transformers from the default PyPI index
+# (CUDA-enabled on Linux x86_64). For a specific CUDA version or CPU-only wheels on
+# Linux, use scripts/install_pytorch.sh or a manual `--index-url` install afterwards.
+embeddings = [
+    "torch",
+    "esm",
+    "transformers",
+]
+test = [
+    "pytest",
+    "pytest-order",
+]
+dev = [
+    "FRIdata[embeddings,test]",
+    "build",
+    "twine",
+]
+
+[project.urls]
+Homepage = "https://github.com/Tomasz-Lab/FRIdata"
+Repository = "https://github.com/Tomasz-Lab/FRIdata"
+Issues = "https://github.com/Tomasz-Lab/FRIdata/issues"
 
 [project.scripts]
 fridata = "fridata:main"

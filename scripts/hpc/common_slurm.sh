@@ -21,9 +21,9 @@ start_computation() {
 
     cd $DEEPFRI_PATH
 
-    # Robustly try to load GCC and a Conda/Miniconda module (handle varied names)
+    # Robustly try to load GCC and a Python module (handle varied names)
     LOADED_GCC=false
-    LOADED_CONDA=false
+    LOADED_PYTHON=false
     if command -v module >/dev/null 2>&1; then
         GCC_CANDIDATES=(gcc GCC)
         for MOD in "${GCC_CANDIDATES[@]}"; do
@@ -34,11 +34,12 @@ start_computation() {
             fi
         done
 
-        CONDA_CANDIDATES=(miniconda3 Miniconda3 miniconda Anaconda3 anaconda3)
-        for MOD in "${CONDA_CANDIDATES[@]}"; do
+        # Cluster-specific: adjust these names to match `module avail python`.
+        PYTHON_CANDIDATES=(python Python python3 Python3)
+        for MOD in "${PYTHON_CANDIDATES[@]}"; do
             if module load "$MOD" >/dev/null 2>&1; then
                 echo "Loaded module: $MOD"
-                LOADED_CONDA=true
+                LOADED_PYTHON=true
                 break
             fi
         done
@@ -49,13 +50,20 @@ start_computation() {
         exit 1
     fi
 
-    if [ "$LOADED_CONDA" = false ]; then
-        echo "Error: Could not load a Conda module."
+    if [ "$LOADED_PYTHON" = false ]; then
+        echo "Error: Could not load a Python module."
         exit 1
     fi
 
-    eval "$(conda shell.bash hook)"
-    conda activate $CONDA_ENV_PATH
+    # Activate the FRIdata virtualenv created by initialize_slurm.sh.
+    if [[ ! -v VENV_PATH ]]; then
+        VENV_PATH="$DEEPFRI_PATH/.venv"
+    fi
+    if [ ! -f "$VENV_PATH/bin/activate" ]; then
+        echo "Error: virtualenv not found at '$VENV_PATH'. Run initialize_slurm.sh first."
+        exit 1
+    fi
+    source "$VENV_PATH/bin/activate"
 
     echo "Start time: `date`"
     start_time=$(date +%s)
