@@ -27,6 +27,7 @@ class GLM2Embedder(BaseEmbedder):
         sequence = PREP_SIGN + prot_seq
         inputs = self.tokenizer([sequence], return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        self.model.eval()
         outputs = self.model(inputs["input_ids"], output_hidden_states=True)
         embeddings = outputs.last_hidden_state[0]
         return embeddings.to("cpu").detach().to(torch.float32).numpy()

@@ -11,8 +11,10 @@ class ESMCEmbedder(BaseEmbedder):
 
     def get_embedding(self, prot_id, prot_seq):
         protein = ESMProtein(sequence=prot_seq)
-        protein_tensor = self.model.encode(protein)
-        logits_output = self.model.logits(
-            protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
-        )
+        self.model.eval()
+        with torch.inference_mode():
+            protein_tensor = self.model.encode(protein)
+            logits_output = self.model.logits(
+                protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
+            )
         return logits_output.embeddings[0,:,:].to('cpu').detach().to(torch.float32).numpy()

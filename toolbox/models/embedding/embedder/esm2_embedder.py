@@ -16,6 +16,8 @@ class ESM2Embedder(BaseEmbedder):
     def get_embedding(self, prot_id, prot_seq):
         inputs = self.tokenizer(prot_seq, return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        outputs = self.model(**inputs, output_hidden_states=True)
+        self.model.eval()
+        with torch.inference_mode():
+            outputs = self.model(**inputs, output_hidden_states=True)
         embeddings = outputs.hidden_states[-1]
         return embeddings[0,:].to('cpu').detach().to(torch.float32).numpy()
