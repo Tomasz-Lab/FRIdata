@@ -258,6 +258,14 @@ class CommandParser:
         from toolbox.models.manage_dataset.utils import format_time
 
         logger.info(f"Total time for all steps: {format_time(time.time() - started_at)}")
+
+        ds = getattr(self, "structures_dataset", None)
+        if ds is not None:
+            embeddings_idx_path = ds.embeddings_index_path()
+            if embeddings_idx_path.exists():
+                total_embeddings = len(read_index(embeddings_idx_path, ds.config.data_path))
+                logger.info(f"Total number of embeddings: {total_embeddings}")
+
         if is_error:
             logger.error("Error! Exiting...")
         else:
