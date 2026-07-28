@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple, Optional
 from toolbox.models.manage_dataset.compute_batches import ComputeBatches
 from toolbox.models.manage_dataset.index.handle_index import read_index, create_index
 from toolbox.models.manage_dataset.index.handle_indexes import HandleIndexes
-from toolbox.models.manage_dataset.utils import format_time, read_pdbs_from_h5
+from toolbox.models.manage_dataset.utils import format_time, groupby_dict_by_values, read_pdbs_from_h5
 from toolbox.models.utils.cif2pdb import aa_dict
 from toolbox.config import CarbonAtomType
 from toolbox.utlis.logging import log_title, logger
@@ -274,8 +274,15 @@ class SequenceAndCoordinatesRetriever:
         """
         structures_dataset = self.structures_dataset
         client: Client = structures_dataset._client
-        
-        log_title("Retrieving sequences and coordinates")
+
+        if is_sequences_retrieved and is_coordinates_retrieved:
+            retrieved_desc = "sequences and coordinates"
+        elif is_sequences_retrieved:
+            retrieved_desc = "sequences"
+        else:
+            retrieved_desc = "coordinates"
+
+        log_title(f"Retrieving {retrieved_desc}")
 
         start = time.time()
 
@@ -285,21 +292,29 @@ class SequenceAndCoordinatesRetriever:
             structures_dataset.config.data_path
         )
 
-        # search sequences
-        search_sequences_index_result = self.handle_indexes.full_handle(
-            "sequences", protein_index, structures_dataset.overwrite
-        )
+        missing_sequences = []
+        sequences_coords_index = {}
+        coordinates_index = {}
+        missing_protein_files = {}
 
-        h5_file_to_codes = search_sequences_index_result.grouped_missing_proteins
-        missing_sequences = search_sequences_index_result.missing_protein_files.keys()
-        sequences_coords_index = search_sequences_index_result.present
+        if is_sequences_retrieved:
+            search_sequences_index_result = self.handle_indexes.full_handle(
+                "sequences", protein_index, structures_dataset.overwrite
+            )
+            missing_sequences = search_sequences_index_result.missing_protein_files.keys()
+            sequences_coords_index = search_sequences_index_result.present
+            missing_protein_files.update(search_sequences_index_result.missing_protein_files)
 
-        search_coordinates_index_result = self.handle_indexes.full_handle(
-            "coordinates", protein_index, structures_dataset.overwrite
-        )
-        coordinates_index = search_coordinates_index_result.present
+        if is_coordinates_retrieved:
+            search_coordinates_index_result = self.handle_indexes.full_handle(
+                "coordinates", protein_index, structures_dataset.overwrite
+            )
+            coordinates_index = search_coordinates_index_result.present
+            missing_protein_files.update(search_coordinates_index_result.missing_protein_files)
 
-        logger.info("Getting sequences and coordinates from stored PDBs")
+        h5_file_to_codes = groupby_dict_by_values(missing_protein_files)
+
+        logger.info(f"Getting {retrieved_desc} from stored PDBs")
         
         # Get protein entries with range information if available
         protein_entries = structures_dataset.get_protein_entries_with_ranges()
@@ -356,8 +371,7 @@ class SequenceAndCoordinatesRetriever:
             if sequences_file is not None:
                 sequences_file.close()
 
-        log_line = f"Saving {'sequences' if is_sequences_retrieved else ''} {'and' if is_sequences_retrieved and is_coordinates_retrieved else ''} {'coordinates' if is_coordinates_retrieved else ''}"
-        logger.info(log_line)
+        logger.info(f"Saving {retrieved_desc}")
 
         if is_sequences_retrieved:
             # Update index with sequence file path (store as string like the original sequence_retriever)
