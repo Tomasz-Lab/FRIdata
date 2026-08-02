@@ -377,7 +377,8 @@ def fetch_one_afdb(
     Returns:
         Tuple of (uniprot_id, None) on success or (uniprot_id, exception) on failure
     """
-    if not is_afdb_downloadable_id(uniprot_id):
+    accession = extract_afdb_uniprot_id(uniprot_id)
+    if accession is None:
         error = ValueError(f"Cannot extract AFDB identifier from '{uniprot_id}'")
         logger.debug("Skipping non-downloadable AFDB ID %s", uniprot_id)
         return uniprot_id, error
@@ -387,8 +388,10 @@ def fetch_one_afdb(
 
     for attempt in range(1, attempts + 1):
         try:
+            # biotite >=1.0 requires the bare UniProt accession here; it no longer
+            # strips the full 'AF-<acc>-F1-model_v4' form itself (biotite 0.41 did).
             biotite.database.afdb.fetch(
-                ids=[uniprot_id],
+                ids=[accession],
                 format="cif",
                 target_path=str(target_path),
                 overwrite=False,
@@ -522,7 +525,7 @@ def retrieve_afdb_chunk_to_h5_concurrent(
                 for chain_id, pdb_content in converted.items():
                     all_res_pdbs.append(chain_id)
                     all_contents.append(pdb_content)
-                succeeded_uniprot_ids.add(uniprot_id)
+                succeeded_uniprot_ids.add(canonical_afdb_uniprot_id(uniprot_id))
                     
             except Exception as e:
                 logger.error(f"Error processing {cif_file}: {e}")
@@ -540,7 +543,11 @@ def retrieve_afdb_chunk_to_h5_concurrent(
         if h5_file_path is None:
             return [], "", skipped_ids + chunk_ids, {}
         
-        missing_ids = [uniprot_id for uniprot_id in chunk_ids if uniprot_id not in succeeded_uniprot_ids]
+        missing_ids = [
+            uniprot_id
+            for uniprot_id in chunk_ids
+            if canonical_afdb_uniprot_id(uniprot_id) not in succeeded_uniprot_ids
+        ]
         missing_ids.extend(skipped_ids)
         return (
             all_res_pdbs,
