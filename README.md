@@ -3,7 +3,7 @@
 [![CI](https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-FRIdata-blue?style=flat-square)](https://tomasz-lab.github.io/FRIdata/)
 [![GitHub](https://img.shields.io/badge/source-GitHub-303030.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/)
-[![Python](https://img.shields.io/badge/python-3.10-blue.svg?style=flat-square&logo=python)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.14-blue.svg?style=flat-square&logo=python)](https://www.python.org/)
 [![Dask](https://img.shields.io/badge/impl-Dask-blue?style=flat-square)](https://docs.dask.org/en/stable/)
 [![License](https://img.shields.io/github/license/Tomasz-Lab/FRIdata?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/blob/main/LICENSE)
 [![Issues](https://img.shields.io/github/issues/Tomasz-Lab/FRIdata.svg?style=flat-square)](https://github.com/Tomasz-Lab/FRIdata/issues)
@@ -56,7 +56,7 @@ How much of that source to include.
 
 ## Installation
 
-FRIdata is a pure-pip project (Python >= 3.10). No conda/mamba required.
+FRIdata is a pure-pip project (Python >= 3.11). No conda/mamba required.
 
 The core install covers `sequences`, `coordinates` and `distograms`. Embedding
 generation needs the heavier `torch`/`esm`/`transformers` stack, which lives in
