@@ -7,13 +7,16 @@ name = "FRIdata"
 version = "0.1.0"
 description = "Generate sequences, coordinates, distograms, and embeddings from protein structures at scale."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "BSD-3-Clause" }
 authors = [{ name = "Tomasz Lab" }]
 keywords = ["bioinformatics", "protein-structure", "dask", "dataset"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
@@ -25,20 +28,20 @@ classifiers = [
 dependencies = [
     "foldcomp",
     "pydantic>=2.8.2",
-    "scipy>=1.14.0",
+    "scipy>=1.16.0",
     "h5py",
     "matplotlib",
-    "biotite>=0.41.2",
-    "numpy>=1.26.4,<1.27.0",
+    "biotite>=1.1.0",
+    "numpy>=2.1.0,<3.0.0",
     "genson",
     "beautifulsoup4",
     "biopython",
-    "dask>=2024.4.2,<2025.0.0",
+    "dask>=2025.1.0",
     "dask[dataframe]",
-    "distributed>=2024.4.2,<2025.0.0",
+    "distributed>=2025.1.0",
     "python-dotenv",
     "tables",
-    "bokeh>=2.4.2,<3.0.0",
+    "bokeh>=3.1.0",
     "tqdm",
 ]
 
