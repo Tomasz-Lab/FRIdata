@@ -31,6 +31,7 @@ OUTPATH = Path(__file__).parent / "data" / "embeddings_generated"
 SEQ_1 = "MKVLLYIAASCLMLLALNVSAENTQQEEEDYDYG"
 SEQ_2 = "_-XSVAAAVAGLLFGLDIGVIAGALPFITDHFVLTSRLQEW"
 ESM_MODEL = "esm2_t33_650M_UR50D"
+ESMC_MODEL = "esmc_300m"
 
 @pytest.fixture(scope="session", autouse=True)
 def clean_generated_files(tmp_path_factory):
@@ -50,10 +51,8 @@ def clean_generated_files(tmp_path_factory):
     #     f.unlink()
 
 
-# NOTE: Embeddings generated with different environments 
+# NOTE: Embeddings generated with different environments
 # may differ slightly and tests may fail due to this.
-# TODO: @Adam: add test for ESM-C
-# TODO: @Pawel: add expected output for ESM-C
 def test_esm():
 
     exp_1 = np.load(EXPPATH / f'{ESM_MODEL}__SEQ_1.npy') 
@@ -71,6 +70,33 @@ def test_esm():
 
     assert np.allclose(exp_1, res_1, rtol=1e-4, atol=1e-5)
     assert np.allclose(exp_2, res_2, rtol=1e-4, atol=1e-5)
+
+def test_esmc():
+    # Expected data was generated with python 3.12 by the ESMCEmbedder itself,
+    # which puts the model in eval() mode and runs under torch.inference_mode().
+    # Keep both of these when you regenerate the data, or the values change.
+    exp_1 = np.load(EXPPATH / f'{ESMC_MODEL}__SEQ_1.npy')
+    exp_2 = np.load(EXPPATH / f'{ESMC_MODEL}__SEQ_2.npy')
+    dict_ = {"SEQ_1": SEQ_1, "SEQ_2": SEQ_2}
+
+    from toolbox.models.embedding.embedder.esmc_embedder import ESMCEmbedder
+
+    # Own output directory so the ESM2 batch files are not overwritten.
+    out_path = OUTPATH / ESMC_MODEL
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    embedder = ESMCEmbedder(model_name=ESMC_MODEL)
+    embedder.embed(dict_, out_path)
+
+    with h5py.File(out_path / 'batch_0.h5', 'r') as f:
+        res_1 = f['SEQ_1'][:]
+        res_2 = f['SEQ_2'][:]
+
+    assert res_1.shape == exp_1.shape
+    assert res_2.shape == exp_2.shape
+    assert np.allclose(exp_1, res_1, rtol=1e-4, atol=1e-5)
+    assert np.allclose(exp_2, res_2, rtol=1e-4, atol=1e-5)
+
 
 # TODO
 # Add tests for other embeddings (Ankh etc.)
