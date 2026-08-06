@@ -263,7 +263,14 @@ class StructuresDataset(BaseModel):
                 and len(missing_ids) > 0
             ):
                 raise RuntimeError(
-                    "Missing ids are not allowed when subsetting all DBs!"
+                    f"Cannot subset database type 'other': {len(missing_ids)} of "
+                    f"{len(missing_ids) + len(present_file_paths)} requested ids are not present "
+                    f"in any existing dataset built from input path '{self.input_path}'. "
+                    "Structures for 'other' cannot be downloaded - they must first be indexed by "
+                    "running `fridata generate_data -d other -c all --input-path <path>`, "
+                    "and only then subsetted with `-c subset -i <ids_file>`. "
+                    "Also make sure the ids in the ids file match the file names under the input path. "
+                    f"Missing ids (first 10): {', '.join(sorted(missing_ids)[:10])}"
                 )
 
             if len(missing_ids) > 0:
