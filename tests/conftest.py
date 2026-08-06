@@ -3,7 +3,7 @@ import dotenv
 import logging
 import sys
 from _pytest.monkeypatch import MonkeyPatch
-from toolbox.utlis.logging import set_config
+from fridata.utlis.logging import set_config
 import os
 
 from tests.paths import OUTPATH, EXPPATH
@@ -34,9 +34,9 @@ def setup_main_path(request):
         )
         
         # Set specific loggers to INFO level to capture performance data
-        logging_module.getLogger('toolbox').setLevel(logging.INFO)
-        logging_module.getLogger('toolbox.models').setLevel(logging.INFO)
-        logging_module.getLogger('toolbox.models.manage_dataset').setLevel(logging.INFO)
+        logging_module.getLogger('fridata').setLevel(logging.INFO)
+        logging_module.getLogger('fridata.models').setLevel(logging.INFO)
+        logging_module.getLogger('fridata.models.manage_dataset').setLevel(logging.INFO)
         
     set_config(configure_logging)
 

@@ -70,13 +70,11 @@ Repository = "https://github.com/Tomasz-Lab/FRIdata"
 Issues = "https://github.com/Tomasz-Lab/FRIdata/issues"
 
 [project.scripts]
-fridata = "fridata:main"
+fridata = "fridata.cli:main"
 
 [tool.setuptools]
-# fridata.py is a single-module at project root; install as py-module
-py-modules = ["fridata"]
 include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["toolbox*"]
+include = ["fridata*"]

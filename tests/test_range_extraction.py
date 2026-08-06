@@ -1,6 +1,6 @@
 """Tests for range-aware protein extraction"""
 import pytest
-from toolbox.models.manage_dataset.sequences.sequence_and_coordinates_retriever import (
+from fridata.models.manage_dataset.sequences.sequence_and_coordinates_retriever import (
     __extract_sequences_and_coordinates__,
     _is_residue_in_ranges
 )

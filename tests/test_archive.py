@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from toolbox.models.manage_dataset.utils import compress_and_save_h5
-from toolbox.scripts.archive import (
+from fridata.models.manage_dataset.utils import compress_and_save_h5
+from fridata.scripts.archive import (
     _shard_zip_name,
     merge_shard_zips_flat,
     normalize_pdb_codes_for_h5,

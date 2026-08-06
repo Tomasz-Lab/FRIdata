@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 import pytest
 
-from fridata import create_parser, validate_inspect_h5_cli_args
+from fridata.cli import create_parser, validate_inspect_h5_cli_args
 
 
 def write_distograms_batch(path: Path, entries: dict[str, np.ndarray]) -> None:
@@ -84,7 +84,7 @@ def test_render_numeric_modes_include_section_shape_preview(
     key_line: str,
     shape_line: str,
 ) -> None:
-    from toolbox.utlis.inspect_h5 import render_inspect_h5_content
+    from fridata.utlis.inspect_h5 import render_inspect_h5_content
 
     h5_path = tmp_path / "batch.h5"
     file_writer(h5_path)
@@ -127,7 +127,7 @@ def test_render_numeric_modes_full_dump_with_name(
     file_writer,
     expected_value: str,
 ) -> None:
-    from toolbox.utlis.inspect_h5 import render_inspect_h5_content
+    from fridata.utlis.inspect_h5 import render_inspect_h5_content
 
     h5_path = tmp_path / "batch.h5"
     file_writer(h5_path)
@@ -139,7 +139,7 @@ def test_render_numeric_modes_full_dump_with_name(
 
 
 def test_render_distogram_ordered_name_filter(tmp_path: Path) -> None:
-    from toolbox.utlis.inspect_h5 import render_inspect_h5_content
+    from fridata.utlis.inspect_h5 import render_inspect_h5_content
 
     h5_path = tmp_path / "b.h5"
     write_distograms_batch(
@@ -158,7 +158,7 @@ def test_render_distogram_ordered_name_filter(tmp_path: Path) -> None:
 
 def test_render_large_distogram_skips_high_cost_stats(tmp_path: Path) -> None:
     """Matrices over FULL_STATS_MAX_ELEMENTS omit full-volume stats line."""
-    from toolbox.utlis import inspect_h5 as ih
+    from fridata.utlis import inspect_h5 as ih
 
     path = tmp_path / "big.h5"
     n = 400
@@ -176,7 +176,7 @@ def test_render_large_distogram_skips_high_cost_stats(tmp_path: Path) -> None:
 def test_render_missing_name_warns_and_skips(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    from toolbox.utlis.inspect_h5 import render_inspect_h5_content
+    from fridata.utlis.inspect_h5 import render_inspect_h5_content
 
     path = tmp_path / "m.h5"
     write_distograms_batch(path, {"have": np.eye(2, dtype=np.float32)})
@@ -190,7 +190,7 @@ def test_render_missing_name_warns_and_skips(
 def test_render_skips_bad_group_but_keeps_good(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    from toolbox.utlis.inspect_h5 import render_inspect_h5_content
+    from fridata.utlis.inspect_h5 import render_inspect_h5_content
 
     p = tmp_path / "partial.h5"
     with h5py.File(p, "w") as hf:
@@ -206,7 +206,7 @@ def test_render_skips_bad_group_but_keeps_good(
 
 
 def test_render_structures_pdbs_shard(tmp_path: Path) -> None:
-    from toolbox.utlis.inspect_h5 import render_inspect_h5_content
+    from fridata.utlis.inspect_h5 import render_inspect_h5_content
 
     p = tmp_path / "pdbs.h5"
     write_pdbs_shard(p, {"CODE1": "HEADER\nLINE2", "CODE2": "OTHER"})
@@ -221,19 +221,19 @@ def test_render_structures_pdbs_shard(tmp_path: Path) -> None:
 
 
 def test_render_missing_file_returns_none(tmp_path: Path) -> None:
-    from toolbox.utlis.inspect_h5 import render_inspect_h5_content
+    from fridata.utlis.inspect_h5 import render_inspect_h5_content
 
     missing = tmp_path / "does_not_exist.h5"
     assert render_inspect_h5_content(missing, "preview", None) is None
 
 
 def test_inspect_h5_save_to_temp(tmp_path: Path) -> None:
-    from toolbox.utlis.inspect_h5 import inspect_h5
+    from fridata.utlis.inspect_h5 import inspect_h5
 
     h5_path = tmp_path / "batch.h5"
     write_distograms_batch(h5_path, {"protA": np.eye(2, dtype=np.float32)})
 
-    with patch("toolbox.utlis.inspect_h5.subprocess.run") as mock_run:
+    with patch("fridata.utlis.inspect_h5.subprocess.run") as mock_run:
         out = inspect_h5(h5_path, mode="distograms", names=("protA",), save="")
 
     mock_run.assert_not_called()
@@ -243,13 +243,13 @@ def test_inspect_h5_save_to_temp(tmp_path: Path) -> None:
 
 
 def test_inspect_h5_save_to_filepath(tmp_path: Path) -> None:
-    from toolbox.utlis.inspect_h5 import inspect_h5
+    from fridata.utlis.inspect_h5 import inspect_h5
 
     h5_path = tmp_path / "batch.h5"
     out_path = tmp_path / "out" / "dump.txt"
     write_distograms_batch(h5_path, {"protA": np.eye(2, dtype=np.float32)})
 
-    with patch("toolbox.utlis.inspect_h5.subprocess.run") as mock_run:
+    with patch("fridata.utlis.inspect_h5.subprocess.run") as mock_run:
         out = inspect_h5(
             h5_path, mode="distograms", names=("protA",), save=str(out_path)
         )

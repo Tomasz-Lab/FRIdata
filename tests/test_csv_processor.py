@@ -2,7 +2,7 @@
 import pytest
 import tempfile
 from pathlib import Path
-from toolbox.models.manage_dataset.csv_processor import CSVProcessor, ProteinEntry
+from fridata.models.manage_dataset.csv_processor import CSVProcessor, ProteinEntry
 
 
 class TestProteinEntry:

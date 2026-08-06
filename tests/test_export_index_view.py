@@ -4,7 +4,7 @@ import pytest
 
 from tests.paths import EXPPATH
 
-from toolbox.viewer.export_index_html import (
+from fridata.viewer.export_index_html import (
     discover_dataset,
     extract_dataset_identity_from_path,
     extract_batch_id_from_path,

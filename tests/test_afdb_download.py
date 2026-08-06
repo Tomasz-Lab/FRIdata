@@ -10,12 +10,12 @@ import distributed
 import tempfile
 
 from tests.paths import OUTPATH
-from toolbox.config import Config
-from toolbox.models.manage_dataset.structures_dataset import StructuresDataset
-from toolbox.models.manage_dataset.collection_type import CollectionType
-from toolbox.models.manage_dataset.database_type import DatabaseType
-from toolbox.models.manage_dataset.index.handle_index import read_index
-from toolbox.models.manage_dataset.utils import canonical_afdb_uniprot_id
+from fridata.config import Config
+from fridata.models.manage_dataset.structures_dataset import StructuresDataset
+from fridata.models.manage_dataset.collection_type import CollectionType
+from fridata.models.manage_dataset.database_type import DatabaseType
+from fridata.models.manage_dataset.index.handle_index import read_index
+from fridata.models.manage_dataset.utils import canonical_afdb_uniprot_id
 
 # give 666 permissions to new files
 os.umask(0o002)

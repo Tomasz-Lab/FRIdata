@@ -1,6 +1,6 @@
 """Unit tests for downloaded_structures.idx helper maps (no network)."""
 
-from toolbox.models.manage_dataset.utils import (
+from fridata.models.manage_dataset.utils import (
     canonical_afdb_uniprot_id,
     downloaded_structures_map_afdb_fetched,
     downloaded_structures_map_rcsb,

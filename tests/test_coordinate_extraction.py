@@ -1,7 +1,7 @@
 import pytest
 import textwrap
 from pathlib import Path
-from toolbox.models.manage_dataset.sequences.sequence_and_coordinates_retriever import __extract_sequences_and_coordinates__
+from fridata.models.manage_dataset.sequences.sequence_and_coordinates_retriever import __extract_sequences_and_coordinates__
 
 
 # Test data paths

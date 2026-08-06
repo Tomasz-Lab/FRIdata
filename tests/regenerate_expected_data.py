@@ -31,11 +31,11 @@ project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from toolbox.config import Config
-from toolbox.models.embedding.embedder.embedder_type import EmbedderType
-from toolbox.models.manage_dataset.structures_dataset import StructuresDataset
-from toolbox.models.manage_dataset.collection_type import CollectionType
-from toolbox.models.manage_dataset.database_type import DatabaseType
+from fridata.config import Config
+from fridata.models.embedding.embedder.embedder_type import EmbedderType
+from fridata.models.manage_dataset.structures_dataset import StructuresDataset
+from fridata.models.manage_dataset.collection_type import CollectionType
+from fridata.models.manage_dataset.database_type import DatabaseType
 
 # Set permissions for new files
 os.umask(0o002)

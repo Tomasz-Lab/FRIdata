@@ -14,7 +14,7 @@ from os.path import join
 # `pip install -e .[test]` checkout can still run the rest of the suite.
 pytest.importorskip("torch", reason="install FRIdata[embeddings] to run embedding tests")
 
-from toolbox.models.embedding.embedder.esm2_embedder import ESM2Embedder
+from fridata.models.embedding.embedder.esm2_embedder import ESM2Embedder
 from tests.utils import compare_pdb_files
 from pathlib import Path
 
@@ -79,7 +79,7 @@ def test_esmc():
     exp_2 = np.load(EXPPATH / f'{ESMC_MODEL}__SEQ_2.npy')
     dict_ = {"SEQ_1": SEQ_1, "SEQ_2": SEQ_2}
 
-    from toolbox.models.embedding.embedder.esmc_embedder import ESMCEmbedder
+    from fridata.models.embedding.embedder.esmc_embedder import ESMCEmbedder
 
     # Own output directory so the ESM2 batch files are not overwritten.
     out_path = OUTPATH / ESMC_MODEL
@@ -106,11 +106,11 @@ def test_embedding_run_persists_embedder_metadata(tmp_path):
     import json
     from unittest.mock import patch
 
-    from toolbox.config import Config
-    from toolbox.models.embedding.embedder.embedder_type import EmbedderType
-    from toolbox.models.manage_dataset.collection_type import CollectionType
-    from toolbox.models.manage_dataset.database_type import DatabaseType
-    from toolbox.models.manage_dataset.structures_dataset import StructuresDataset
+    from fridata.config import Config
+    from fridata.models.embedding.embedder.embedder_type import EmbedderType
+    from fridata.models.manage_dataset.collection_type import CollectionType
+    from fridata.models.manage_dataset.database_type import DatabaseType
+    from fridata.models.manage_dataset.structures_dataset import StructuresDataset
 
     config = Config(
         data_path=str(tmp_path),
@@ -132,16 +132,16 @@ def test_embedding_run_persists_embedder_metadata(tmp_path):
     dataset.save_dataset_metadata()
 
     with patch(
-        "toolbox.models.embedding.embedding.search_embedding_indexes"
+        "fridata.models.embedding.embedding.search_embedding_indexes"
     ) as mock_search, patch(
-        "toolbox.models.embedding.embedding.Embedding.missing_ids_to_fasta",
+        "fridata.models.embedding.embedding.Embedding.missing_ids_to_fasta",
         return_value={},
     ), patch(
-        "toolbox.models.embedding.embedder.embedder_type.EmbedderType.create_embedder"
+        "fridata.models.embedding.embedder.embedder_type.EmbedderType.create_embedder"
     ) as mock_create_embedder, patch(
-        "toolbox.models.manage_dataset.index.handle_index.create_index"
+        "fridata.models.manage_dataset.index.handle_index.create_index"
     ):
-        from toolbox.models.manage_dataset.index.handle_indexes import SearchIndexResult
+        from fridata.models.manage_dataset.index.handle_indexes import SearchIndexResult
 
         mock_search.return_value = SearchIndexResult(
             missing_protein_files={},

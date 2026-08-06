@@ -11,9 +11,9 @@ import distributed
 import pathlib
 from tests.utils import compare_dicts, compare_pdb_contents, FileComparator
 from tests.paths import OUTPATH, EXPPATH
-from toolbox.config import Config
+from fridata.config import Config
 
-from toolbox.models.embedding.embedder.embedder_type import EmbedderType
+from fridata.models.embedding.embedder.embedder_type import EmbedderType
 
 # give 666 permissions to new files
 os.umask(0o002)
@@ -156,9 +156,9 @@ def test5_fifth_7():
 
 
 def create_dataset_and_abstractions(dataset_name, ids_file_path, overwrite=False):
-    from toolbox.models.manage_dataset.structures_dataset import StructuresDataset
-    from toolbox.models.manage_dataset.collection_type import CollectionType
-    from toolbox.models.manage_dataset.database_type import DatabaseType
+    from fridata.models.manage_dataset.structures_dataset import StructuresDataset
+    from fridata.models.manage_dataset.collection_type import CollectionType
+    from fridata.models.manage_dataset.database_type import DatabaseType
 
     config = Config(
         data_path=str(OUTPATH),
@@ -257,7 +257,7 @@ def compare_index_files(dataset_name):
 
 
 def compare_generated_abstraction_with_expected(dataset_name):
-    from toolbox.models.manage_dataset.utils import read_pdbs_from_h5
+    from fridata.models.manage_dataset.utils import read_pdbs_from_h5
     
     # Compare distogram files
     # distogram_expected = EXPPATH / "distograms" / f"PDB-subset--{dataset_name}" / "batch_0.h5"

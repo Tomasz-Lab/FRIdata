@@ -3,12 +3,12 @@ import shutil
 import pytest
 import textwrap 
 
-from toolbox.models.manage_dataset.collection_type import CollectionType
-from toolbox.models.manage_dataset.database_type import DatabaseType
-from toolbox.models.manage_dataset.structures_dataset import StructuresDataset
-from toolbox.models.manage_dataset.utils import read_pdbs_from_h5
-from toolbox.models.utils.cif2pdb import cif_to_pdb
-from toolbox.config import Config
+from fridata.models.manage_dataset.collection_type import CollectionType
+from fridata.models.manage_dataset.database_type import DatabaseType
+from fridata.models.manage_dataset.structures_dataset import StructuresDataset
+from fridata.models.manage_dataset.utils import read_pdbs_from_h5
+from fridata.models.utils.cif2pdb import cif_to_pdb
+from fridata.config import Config
 from tests.utils import compare_pdb_files, create_temp_txt_file
 from pathlib import Path
 

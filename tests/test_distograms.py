@@ -1,8 +1,8 @@
 import numpy as np
 import inspect
 
-from toolbox.models.manage_dataset.distograms.generate_distograms import __process_coordinates__
-from toolbox.models.manage_dataset.sequences.sequence_and_coordinates_retriever import __get_sequences_and_coordinates_from_batch__
+from fridata.models.manage_dataset.distograms.generate_distograms import __process_coordinates__
+from fridata.models.manage_dataset.sequences.sequence_and_coordinates_retriever import __get_sequences_and_coordinates_from_batch__
 from pathlib import Path
 
 # ==========================================================================================

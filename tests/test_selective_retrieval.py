@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from toolbox.models.manage_dataset.sequences.sequence_and_coordinates_retriever import (
+from fridata.models.manage_dataset.sequences.sequence_and_coordinates_retriever import (
     __get_sequences_and_coordinates_from_batch__,
 )
 

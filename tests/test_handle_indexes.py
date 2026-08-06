@@ -9,10 +9,10 @@ import logging
 import warnings
 import distributed
 
-from toolbox.config import Config, CarbonAtomType
+from fridata.config import Config, CarbonAtomType
 from tests.paths import EXPPATH
-from toolbox.models.embedding.embedder.embedder_type import EmbedderType
-from toolbox.models.manage_dataset.index.handle_indexes import IndexableAbstraction
+from fridata.models.embedding.embedder.embedder_type import EmbedderType
+from fridata.models.manage_dataset.index.handle_indexes import IndexableAbstraction
 
 n_cores = os.cpu_count()
 
@@ -76,7 +76,7 @@ def test_distograms_for_cb_missing():
     assert len(found_items) == 0
 
 def perform_index_search(index_type: IndexableAbstraction, embedder_type: EmbedderType, disto_type: CarbonAtomType):
-    from toolbox.models.manage_dataset.index.handle_indexes import HandleIndexes
+    from fridata.models.manage_dataset.index.handle_indexes import HandleIndexes
 
     dataset = create_dataset("test_dataset", embedder_type, disto_type)
 
@@ -94,9 +94,9 @@ def create_dataset(
     disto_type: CarbonAtomType,
     overwrite=False
 ):
-    from toolbox.models.manage_dataset.structures_dataset import StructuresDataset
-    from toolbox.models.manage_dataset.collection_type import CollectionType
-    from toolbox.models.manage_dataset.database_type import DatabaseType
+    from fridata.models.manage_dataset.structures_dataset import StructuresDataset
+    from fridata.models.manage_dataset.collection_type import CollectionType
+    from fridata.models.manage_dataset.database_type import DatabaseType
 
     config = Config(
         data_path=str(EXPPATH),

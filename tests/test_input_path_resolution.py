@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from toolbox.models.manage_dataset import extract_archive as extract_archive_mod
-from toolbox.models.manage_dataset.extract_archive import (
+from fridata.models.manage_dataset import extract_archive as extract_archive_mod
+from fridata.models.manage_dataset.extract_archive import (
     build_stem_to_paths,
     pick_single_path_for_canonical_id,
     resolve_id,
