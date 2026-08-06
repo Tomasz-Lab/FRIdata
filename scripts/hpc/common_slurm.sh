@@ -77,7 +77,7 @@ start_computation() {
          rm $DEEPFRI_PATH/scheduler.json
     fi
 
-    dask scheduler --scheduler-file $DEEPFRI_PATH/scheduler.json --preload ./toolbox/worker_setup.py &
+    dask scheduler --scheduler-file $DEEPFRI_PATH/scheduler.json --preload ./src/fridata/worker_setup.py &
 
     while [[ ! -e $DEEPFRI_PATH/scheduler.json ]]; do
         sleep 10

@@ -1,6 +1,6 @@
 {
     "debug_mode": "warning",
-    "data_path": "/example/toolbox/data",
+    "data_path": "/example/fridata/data",
     "disto_type": "CA",
     "disto_thr": "inf",
     "separator": "-",

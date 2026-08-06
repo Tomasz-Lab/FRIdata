@@ -76,5 +76,15 @@ fridata = "fridata.cli:main"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["fridata*"]
+
+[tool.setuptools.package-data]
+# report.js is read at runtime by fridata/viewer/export_index_html.py
+fridata = ["viewer/report.js"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# "src" so the package is importable without an editable install; "." so
+# tests/conftest.py can do `from tests.paths import ...`.
+pythonpath = ["src", "."]

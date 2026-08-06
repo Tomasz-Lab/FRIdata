@@ -389,7 +389,9 @@ def export_index_view(
         "global": global_rollup,
     }
 
-    reports_dir = (output_dir or (Path(__file__).resolve().parents[2] / "reports")).resolve()
+    # CWD-relative, not package-relative: the package directory is read-only
+    # once installed. Matches how load_config() finds config.json.
+    reports_dir = (output_dir or (Path.cwd() / "reports")).resolve()
     out_file = reports_dir / f"{meta.path.name}.html"
     
     print(f"Rendering HTML report to: {out_file}")
