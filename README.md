@@ -75,7 +75,10 @@ source .venv/bin/activate
 ```
 
 Options: `--cpu` (CPU-only PyTorch), `--skip-pytorch` (core install, no
-embeddings), `-p/--path DIR` (virtualenv location, default `.venv`).
+embeddings), `-p/--path DIR` (virtualenv location, default `.venv`),
+`--python EXEC` (interpreter to build the venv with). By default the script
+takes the newest Python >= 3.11 that it finds on `PATH`, so an older `python3`
+(a conda base environment, for example) does not break the install.
 
 ### Manual installation
 
@@ -132,7 +135,7 @@ EMBEDDER_TYPE=esm2_t33_650M_UR50D
 # (MACOS only) Fix for OpenMP multiple runtime error
 export KMP_DUPLICATE_LIB_OK=TRUE
 
-PYTHONPATH='.' python3 -u ${FRIDATA_PATH}/fridata.py \
+PYTHONPATH="${FRIDATA_PATH}/src" python3 -u -m fridata \
  generate_data \
  -t sequences,coordinates,distograms,embeddings \
  -d AFDB \

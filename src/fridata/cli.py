@@ -20,11 +20,32 @@ import logging
 from fridata.utlis.logging import logger, setup_colored_logging
 from fridata.utlis.colored_logging import setup_logging_with_file
 
+def add_logging_arguments(parser):
+    """Add the logging flags that the top-level parser also has.
+
+    The defaults are ``SUPPRESS`` so that a flag given before the sub-command
+    (``fridata --log-file x create_dataset ...``) is not overwritten by the
+    sub-parser default.
+    """
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="Enable verbose logging",
+    )
+    parser.add_argument(
+        "--log-file",
+        type=pathlib.Path,
+        default=argparse.SUPPRESS,
+        help="Path to log file for file logging",
+    )
+
+
 def add_common_arguments(parser):
     parser.add_argument("--slurm", action="store_true", help="Use SLURM job scheduler")
     parser.add_argument("-p", "--file-path", required=True, type=pathlib.Path)
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
-    parser.add_argument("--log-file", type=pathlib.Path, help="Path to log file for file logging")
+    add_logging_arguments(parser)
 
 
 def add_dataset_parser_arguments(parser, require_db_collection=True):
@@ -101,11 +122,7 @@ def add_dataset_parser_arguments(parser, require_db_collection=True):
           type=pathlib.Path,
             help='Path to tar.gz archive containing structure files'
     )
-    parser.add_argument(
-        "-v", "--verbose", 
-        action="store_true", 
-        help="Enable verbose logging mode"
-    )
+    add_logging_arguments(parser)
 
 
 def add_embedder_argument(parser, required=True):

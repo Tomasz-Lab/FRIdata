@@ -20,6 +20,9 @@ dask-scratch-space
 
 .env
 
+.venv/
+venv/
+
 *.log
 
 *.h5
